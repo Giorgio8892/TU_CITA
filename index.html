@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TUCITA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Layout: barra superior con selector Usuaria/Admin · fondo translúcido de peluquería · Usuaria = tarjeta tipo celular · Admin = panel con pestañas */
+  --bg:#f5f3f7; --surface:#ffffff; --surface-2:#faf8fb; --ink:#1d1726; --muted:#6c6475; --line:#e6e1ea;
+  --accent:#c2185b; --accent-ink:#ffffff;
+  --accent-soft:color-mix(in srgb, var(--accent) 13%, var(--surface));
+  --ok:#1b7a4b; --ok-soft:#dff3e8; --warn:#8a5a00; --warn-soft:#fdf0d5; --bad:#b3261e; --bad-soft:#fbe2e0;
+  --wa:#1a8f4c; --wa-ink:#ffffff; --wa-bubble:#dcf8c6;
+  --bg-op:.14;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"DM Sans","Segoe UI",system-ui,sans-serif;
+  --r:14px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141018; --surface:#1e1824; --surface-2:#251e2c; --ink:#f1ecf4; --muted:#a79fb0; --line:#352b3e;
+    --accent:#f06292; --accent-ink:#1a0d14;
+    --ok:#6fd49c; --ok-soft:#173326; --warn:#f2c46b; --warn-soft:#3a2c10; --bad:#ff8a80; --bad-soft:#3b1a18;
+    --wa:#3ccf7d; --wa-ink:#06200f; --wa-bubble:#1f3b2a;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141018; --surface:#1e1824; --surface-2:#251e2c; --ink:#f1ecf4; --muted:#a79fb0; --line:#352b3e;
+  --accent:#f06292; --accent-ink:#1a0d14;
+  --ok:#6fd49c; --ok-soft:#173326; --warn:#f2c46b; --warn-soft:#3a2c10; --bad:#ff8a80; --bad-soft:#3b1a18;
+  --wa:#3ccf7d; --wa-ink:#06200f; --wa-bubble:#1f3b2a;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;min-height:100%}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0;text-wrap:balance}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.cap::first-letter{text-transform:uppercase}
+
+/* Fondo translúcido */
+.fondo{position:fixed;inset:0;pointer-events:none;opacity:var(--bg-op);background-repeat:repeat;background-position:center;z-index:0}
+.topbar,.wrap{position:relative;z-index:1}
+
+/* Barra superior */
+.topbar{position:sticky;top:0;z-index:5;background:color-mix(in srgb, var(--surface) 92%, transparent);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.02em}
+.brand .dot{width:28px;height:28px;border-radius:9px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:15px}
+.brand small{font-family:var(--body);font-weight:500;font-size:12px;color:var(--muted);letter-spacing:0}
+.seg{display:flex;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px}
+.seg button{border:0;background:transparent;padding:7px 14px;border-radius:999px;cursor:pointer;font-weight:500;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
+.note{font-size:12.5px;color:var(--muted);text-align:center;margin-top:20px}
+
+/* Botones */
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 14px;cursor:pointer;font-weight:500;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--muted)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn-primary:hover{filter:brightness(1.06);border-color:var(--accent)}
+.btn-wa{background:var(--wa);border-color:var(--wa);color:var(--wa-ink);font-weight:700}
+.btn-wa:hover{filter:brightness(1.06);border-color:var(--wa)}
+.btn-sm{padding:6px 10px;font-size:13.5px;border-radius:8px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.link{background:none;border:0;color:var(--accent);cursor:pointer;padding:0;font-weight:500}
+
+/* ===== Vista usuaria ===== */
+.phone{max-width:440px;margin:0 auto;background:color-mix(in srgb, var(--surface) 94%, transparent);backdrop-filter:blur(6px);
+  border:1px solid var(--line);border-radius:24px;overflow:hidden;box-shadow:0 10px 30px rgba(30,10,40,.10)}
+.biz{padding:22px 20px 18px;background:var(--accent-soft);display:flex;gap:14px;align-items:center}
+.logo{width:52px;height:52px;border-radius:16px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;
+  font-family:var(--display);font-weight:800;font-size:20px;flex:none;overflow:hidden}
+.logo img{width:100%;height:100%;object-fit:cover;display:block}
+.biz h1{font-size:21px}
+.biz p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+.progress{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:14px 20px 0}
+.progress div{font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;gap:5px}
+.progress div::before{content:"";height:4px;border-radius:4px;background:var(--line)}
+.progress div.done::before,.progress div.now::before{background:var(--accent)}
+.progress div.now{color:var(--ink);font-weight:700}
+.pane{padding:16px 20px 22px;display:flex;flex-direction:column;gap:12px}
+.pane h2{font-size:18px}
+.back{align-self:flex-start}
+.svc{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;width:100%;padding:13px 14px;
+  border:1px solid var(--line);border-radius:var(--r);background:var(--surface);cursor:pointer}
+.svc:hover{border-color:var(--accent)}
+.svc strong{display:block}
+.svc span{font-size:13px;color:var(--muted)}
+.svc .price{font-weight:700;color:var(--ink);font-size:14.5px;white-space:nowrap}
+.cat{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:4px}
+.days{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.day{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:8px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center}
+.day:hover{border-color:var(--accent)}
+.day small{font-size:11.5px;color:var(--muted);text-transform:capitalize}
+.day b{font-family:var(--display);font-size:20px}
+.slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.slot{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:9px 0;cursor:pointer;font-weight:500}
+.slot:hover{border-color:var(--accent);color:var(--accent)}
+.summary{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:grid;gap:3px;font-size:14px}
+.summary b{font-family:var(--display);font-size:16px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label,.field .lbl{font-size:13px;font-weight:500}
+.field input,.field select{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px}
+.field .hint{font-size:12.5px;color:var(--muted)}
+.phonein{display:flex;align-items:stretch}
+.phonein span{border:1px solid var(--line);border-right:0;border-radius:10px 0 0 10px;padding:10px;background:var(--surface-2);color:var(--muted)}
+.phonein input{border-radius:0 10px 10px 0;flex:1;min-width:0}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:13.5px}
+.check input{margin-top:3px;width:17px;height:17px;accent-color:var(--accent)}
+.err{background:var(--bad-soft);color:var(--bad);border-radius:10px;padding:8px 12px;font-size:13.5px}
+.success{display:flex;flex-direction:column;gap:12px;align-items:center;padding:24px 20px}
+.success > h2{text-align:center}
+.success .tick{width:60px;height:60px;border-radius:50%;background:var(--ok-soft);color:var(--ok);display:grid;place-items:center;font-size:30px;font-weight:700}
+.success .summary{width:100%}
+.preview-title{align-self:stretch;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:6px}
+.wa-chat{align-self:stretch;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.wa-chat .who{font-size:12.5px;color:var(--muted);margin-bottom:6px;display:flex;gap:6px;align-items:center}
+.wa-chat .who::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--wa)}
+.bubble{background:var(--wa-bubble);border-radius:12px 12px 12px 4px;padding:10px 12px;font-size:14px;white-space:pre-line;max-width:92%}
+.bubble small{display:block;text-align:right;color:var(--muted);font-size:11px;margin-top:4px}
+.mail{align-self:stretch;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.mail .mhead{padding:10px 12px;background:var(--surface-2);border-bottom:1px solid var(--line);font-size:13px;display:grid;gap:2px}
+.mail .mbody{padding:12px;font-size:14px;white-space:pre-line}
+.mail .mbody .mbrand{display:flex;gap:8px;align-items:center;font-family:var(--display);font-weight:800;margin-bottom:8px;white-space:normal}
+.mail .mbody .mbrand .logo{width:30px;height:30px;border-radius:9px;font-size:12px}
+.empty{color:var(--muted);font-size:14px;background:var(--surface-2);border-radius:var(--r);padding:14px;text-align:center}
+
+/* ===== Vista admin ===== */
+.adminbox{background:color-mix(in srgb, var(--bg) 88%, transparent);border-radius:20px;padding:4px}
+.panel-head{display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.panel-head h1{font-size:26px}
+.panel-head p{margin:2px 0 0;color:var(--muted)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+.tabs button{border:0;background:none;padding:10px 14px;cursor:pointer;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.tile small{color:var(--muted);font-size:12.5px;display:block}
+.tile b{font-family:var(--display);font-size:24px}
+.tile.alert{border-color:var(--warn);background:var(--warn-soft)}
+.agendabar{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.daybar{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px}
+.dchip{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:7px 12px;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center}
+.dchip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);font-weight:700}
+.dchip .count{background:var(--surface-2);border:1px solid var(--line);border-radius:999px;font-size:12px;padding:0 7px;font-weight:700}
+.list{display:flex;flex-direction:column;gap:10px}
+.cita{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:var(--r);padding:12px 14px;
+  display:grid;grid-template-columns:96px 1fr auto;gap:12px;align-items:center}
+.cita.confirmada{border-left-color:var(--ok)}
+.cita.cancelada{border-left-color:var(--bad);opacity:.65}
+.cita.nueva{box-shadow:0 0 0 2px var(--accent)}
+.cita .hora{font-family:var(--display);font-weight:800;font-size:18px}
+.cita .hora small{display:block;font-family:var(--body);font-weight:400;font-size:12.5px;color:var(--muted)}
+.cita .who b{font-size:15.5px}
+.cita .who div{font-size:13.5px;color:var(--muted)}
+.cita .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.pill{font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px}
+.pill.agendada{background:var(--warn-soft);color:var(--warn)}
+.pill.confirmada{background:var(--ok-soft);color:var(--ok)}
+.pill.cancelada{background:var(--bad-soft);color:var(--bad)}
+.pill.info{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.pill.sent{background:var(--ok-soft);color:var(--ok)}
+
+/* Calendario semanal */
+.week{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.wgrid{display:grid;min-width:720px}
+.whead{padding:8px 6px;border-bottom:1px solid var(--line);border-left:1px solid var(--line);background:var(--surface-2);text-align:center;cursor:pointer}
+.whead:hover{background:var(--accent-soft)}
+.whead b{display:block;text-transform:capitalize;font-size:14px}
+.whead span{font-size:12px;color:var(--muted)}
+.whead.hoy b{color:var(--accent)}
+.wcorner{border-bottom:1px solid var(--line);background:var(--surface-2)}
+.wtimes{position:relative}
+.wtimes span{position:absolute;right:6px;font-size:11.5px;color:var(--muted);transform:translateY(-50%)}
+.wcol{position:relative;border-left:1px solid var(--line);
+  background-image:repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px var(--hour))}
+.wblock{position:absolute;left:4px;right:4px;border-radius:8px;padding:3px 7px;font-size:12px;line-height:1.3;overflow:hidden;cursor:pointer;
+  background:var(--accent-soft);border:1px solid color-mix(in srgb, var(--accent) 35%, transparent);border-left:3px solid var(--warn);text-align:left;color:var(--ink)}
+.wblock.confirmada{border-left-color:var(--ok)}
+.wblock b{display:block;font-size:12px}
+.wblock:hover{filter:brightness(.97)}
+.wnow{position:absolute;left:0;right:0;height:2px;background:var(--bad)}
+.legend{display:flex;gap:14px;font-size:12.5px;color:var(--muted);flex-wrap:wrap;margin-top:10px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:5px;border:1px solid var(--line)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12.5px;color:var(--muted);font-weight:500;background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td.notes{white-space:normal;min-width:180px;color:var(--muted)}
+.toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap}
+.toolbar input{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 12px;min-width:240px}
+.grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;align-items:start}
+.formrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bizlink{font-family:var(--display);font-size:22px;font-weight:800;background:var(--accent-soft);border-radius:12px;padding:14px 16px;word-break:break-all}
+.muted{color:var(--muted)}
+.qr{width:150px;height:150px;border-radius:12px;background:var(--surface-2);border:1px dashed var(--line);display:grid;place-items:center;color:var(--muted);font-size:12.5px;text-align:center;padding:10px}
+.swatches{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sw{width:32px;height:32px;border-radius:50%;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);cursor:pointer}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 2px var(--ink)}
+.sw-custom{width:40px;height:34px;padding:2px;border:1px solid var(--line);border-radius:10px;background:none;cursor:pointer}
+.upload{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.upload .thumb{width:64px;height:64px;border-radius:12px;border:1px dashed var(--line);background:var(--surface-2) center/cover no-repeat;display:grid;place-items:center;font-size:11px;color:var(--muted);text-align:center;overflow:hidden}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.daysel{display:flex;gap:6px;flex-wrap:wrap}
+.daysel label{border:1px solid var(--line);border-radius:10px;padding:6px 10px;cursor:pointer;font-size:13.5px;display:flex;gap:6px;align-items:center;background:var(--surface)}
+.daysel input{accent-color:var(--accent)}
+input[type="range"]{accent-color:var(--accent);width:100%}
+
+/* Login */
+.login{max-width:420px;margin:12px auto 0;background:color-mix(in srgb, var(--surface) 95%, transparent);backdrop-filter:blur(6px);
+  border:1px solid var(--line);border-radius:24px;padding:26px 22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 10px 30px rgba(30,10,40,.10)}
+.login .brandbig{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:800;font-size:26px}
+.login .brandbig .dot{width:36px;height:36px;border-radius:11px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:18px}
+.login p{margin:0;color:var(--muted)}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.btn-google{background:var(--surface);font-weight:700}
+.btn-google .g{width:18px;height:18px;border-radius:50%;background:conic-gradient(#ea4335 0 25%,#fbbc05 0 50%,#34a853 0 75%,#4285f4 0);display:inline-block}
+.info{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13.5px;color:var(--ink)}
+.demo{border:1px dashed var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.demo b{font-size:13px}
+.demo button{display:flex;justify-content:space-between;gap:8px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--surface);
+  border-radius:10px;padding:7px 10px;cursor:pointer;font-size:13px}
+.demo button:hover{border-color:var(--accent)}
+.demo button span{color:var(--muted)}
+
+/* Barra demo de la vista usuaria */
+.demo-bar{max-width:440px;margin:0 auto 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.demo-bar select{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 10px;flex:1;min-width:180px}
+
+/* Encabezado admin y avisos */
+.grow{flex:1;min-width:200px}
+.head-actions{display:flex;gap:8px;align-items:center;position:relative}
+.bell{position:relative}
+.bell .badge{position:absolute;top:-7px;right:-7px;background:var(--bad);color:#fff;border-radius:999px;font-size:11px;font-weight:700;padding:1px 6px;line-height:1.4}
+.dropdown{position:absolute;right:0;top:calc(100% + 8px);width:min(340px, 90vw);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:0 12px 30px rgba(30,10,40,.16);z-index:20;padding:8px;display:flex;flex-direction:column;gap:4px}
+.dropdown .ditem{display:block;text-align:left;width:100%;border:0;background:none;border-radius:10px;padding:8px 10px;cursor:pointer;font-size:13.5px}
+.dropdown .ditem:hover{background:var(--surface-2)}
+.dropdown .ditem span{display:block;color:var(--muted);font-size:12.5px}
+.dropdown .dfoot{display:flex;justify-content:space-between;align-items:center;padding:6px 10px 2px;border-top:1px solid var(--line);margin-top:4px;font-size:13px}
+.banner{border-radius:12px;padding:11px 14px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px;font-size:14px;border:1px solid transparent}
+.banner.warn{background:var(--warn-soft);color:var(--warn);border-color:color-mix(in srgb, var(--warn) 30%, transparent)}
+.banner.bad{background:var(--bad-soft);color:var(--bad);border-color:color-mix(in srgb, var(--bad) 30%, transparent)}
+.banner.neutral{background:var(--surface);color:var(--ink);border-color:var(--line)}
+.blocked{max-width:560px;margin:10px auto;text-align:center;align-items:center}
+.blocked .logo{width:64px;height:64px;font-size:24px;border-radius:18px}
+.toast{position:fixed;right:16px;top:72px;z-index:60;width:min(360px, calc(100% - 32px));background:var(--surface);border:1px solid var(--line);
+  border-radius:16px;box-shadow:0 16px 40px rgba(30,10,40,.22);padding:12px 14px;display:flex;gap:12px;align-items:flex-start}
+.toast .dot{width:34px;height:34px;border-radius:10px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:800;flex:none}
+.toast .tbody{flex:1;font-size:13.5px}
+.toast .tbody small{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+.toast .tclose{border:0;background:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1}
+@media (prefers-reduced-motion:no-preference){ .toast{animation:entra .25s ease-out} @keyframes entra{from{transform:translateY(-8px);opacity:.4}to{transform:none;opacity:1}} }
+
+/* Superadmin */
+.logo.sm{width:34px;height:34px;border-radius:10px;font-size:13px}
+.negcell{display:flex;gap:10px;align-items:center}
+.negcell div span{display:block;color:var(--muted);font-size:12.5px}
+td .acts{display:flex;gap:6px;flex-wrap:wrap;min-width:290px;max-width:330px}
+.sub{display:block;color:var(--muted);font-size:12.5px}
+.rules{margin:0;padding-left:18px;display:grid;gap:6px;font-size:14px}
+.aviso{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line)}
+.aviso:last-child{border-bottom:0}
+
+@media (max-width:760px){
+  .tiles{grid-template-columns:repeat(2,1fr)}
+  .cita{grid-template-columns:70px 1fr}
+  .cita .acts{grid-column:1 / -1;justify-content:flex-start}
+  .grid2{grid-template-columns:1fr}
+}
+@media (max-width:400px){
+  .days,.slots{grid-template-columns:repeat(3,1fr)}
+  .formrow{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:no-preference){
+  .btn,.svc,.day,.slot,.dchip{transition:border-color .15s,filter .15s}
+}
+</style>
+</head>
+<body>
+<div class="fondo" id="fondo" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand"><span class="dot">✓</span>TUCITA <small>prototipo</small></div>
+  <div class="seg" role="group" aria-label="Cambiar vista">
+    <button id="btnUsuaria" data-action="view" data-view="usuaria">Usuaria · Agendar</button>
+    <button id="btnAdmin" data-action="view" data-view="admin">Admin</button>
+    <button id="btnSuper" data-action="view" data-view="super">Superadmin</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="vistaUsuaria"></section>
+  <section id="vistaAdmin" hidden></section>
+  <section id="vistaSuper" hidden></section>
+  <p class="note">Prototipo de TUCITA con datos de ejemplo. Lo que hagas se ve en todas las vistas, pero se borra al recargar la página.</p>
+</main>
+<div id="toasts"></div>
+
+<script>
+/* ---------- Utilidades ---------- */
+const pad = n => String(n).padStart(2, "0");
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseISO = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
+const toMin = h => { const [a,b] = h.split(":").map(Number); return a*60 + b; };
+const toHora = m => `${pad(Math.floor(m/60))}:${pad(m%60)}`;
+const clp = new Intl.NumberFormat("es-CL", { style:"currency", currency:"CLP", maximumFractionDigits:0 });
+const fechaLarga = s => parseISO(s).toLocaleDateString("es-CL", { weekday:"long", day:"numeric", month:"long" });
+const fechaCorta = s => parseISO(s).toLocaleDateString("es-CL", { weekday:"short", day:"numeric", month:"short" });
+const fechaMedia = s => parseISO(s).toLocaleDateString("es-CL", { day:"numeric", month:"long", year:"numeric" });
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const fmtTel = t => `+56 ${t.slice(0,1)} ${t.slice(1,5)} ${t.slice(5)}`;
+const hoyISO = () => iso(new Date());
+const masDias = n => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + n); return iso(d); };
+const diasHasta = s => Math.round((parseISO(s) - parseISO(hoyISO())) / 86400000);
+function sumarMes(s){ const d = parseISO(s), dia = d.getDate(); d.setMonth(d.getMonth() + 1); if (d.getDate() !== dia) d.setDate(0); return iso(d); }
+const slugify = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "mi-negocio";
+const iniciales = s => s.trim().split(/\s+/).slice(0,2).map(w => w[0] || "").join("").toUpperCase() || "TC";
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+function inkFor(hex){
+  const n = parseInt(hex.slice(1), 16), r = (n>>16)&255, g = (n>>8)&255, b = n&255;
+  return (0.299*r + 0.587*g + 0.114*b) / 255 > 0.6 ? "#1a1220" : "#ffffff";
+}
+
+/* Patrón de fondo de peluquería (tijeras, peineta, secador, esmalte, espejo) */
+const PATRON = "data:image/svg+xml," + encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="260" viewBox="0 0 260 260" fill="none" stroke="#7a6e85" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+  <g transform="translate(28 30) rotate(-25 30 30)">
+    <circle cx="14" cy="52" r="9"/><circle cx="40" cy="52" r="9"/>
+    <path d="M19 44 L52 2 M35 44 L4 2"/><circle cx="27" cy="30" r="1.6" fill="#7a6e85"/>
+  </g>
+  <g transform="translate(150 28) rotate(18 40 12)">
+    <rect x="0" y="0" width="84" height="14" rx="4"/>
+    <path d="M8 14v14M16 14v14M24 14v14M32 14v14M40 14v14M48 14v14M56 14v14M64 14v14M72 14v14"/>
+  </g>
+  <g transform="translate(36 150)">
+    <circle cx="30" cy="26" r="24"/><circle cx="30" cy="26" r="9"/>
+    <path d="M54 18h30v16H54"/><path d="M84 18l8-4v28l-8-4"/>
+    <path d="M22 50l-6 34h18l2-34"/>
+  </g>
+  <g transform="translate(176 140)">
+    <rect x="0" y="22" width="40" height="50" rx="10"/><rect x="10" y="0" width="20" height="22" rx="4"/>
+    <path d="M10 44h20"/>
+  </g>
+  <g transform="translate(118 196)">
+    <ellipse cx="18" cy="20" rx="16" ry="20"/><path d="M18 40v24"/>
+  </g>
+  <path d="M120 112l4-10 4 10 10 4-10 4-4 10-4-10-10-4z"/>
+  <path d="M232 228l3-7 3 7 7 3-7 3-3 7-3-7-7-3z"/>
+</svg>`);
+
+/* ---------- Planes y reglas de cobro ---------- */
+const PLANES = { basico:{ nombre:"Básico", precio:14990 }, pro:{ nombre:"Pro", precio:24990 } };
+const GRACIA = 5;        // días de gracia después del vencimiento
+const AVISO_PREVIO = 5;  // días antes del vencimiento en que se avisa
+const PRUEBA = 14;       // días de prueba gratis
+
+/* ---------- Negocios de ejemplo ---------- */
+function proximosDiasDe(cfg, n){
+  const out = []; const d = new Date(); d.setHours(0,0,0,0);
+  let guard = 0;
+  while (out.length < n && guard++ < 60){ if (cfg.dias.includes(d.getDay())) out.push(iso(d)); d.setDate(d.getDate()+1); }
+  return out;
+}
+const cfgBase = o => ({ nombre:"", rubro:"Peluquería", direccion:"Dirección del local", telNegocio:"911112222", correoNegocio:"",
+  apertura:"10:00", cierre:"19:00", dias:[1,2,3,4,5,6], color:null, logo:null, fondo:null, fondoOp:0.14, ...o });
+function crearDatos(cfg, servicios, clientas, citas){
+  const dias = proximosDiasDe(cfg, 5);
+  return {
+    servicios: servicios.map((s,i) => ({ id:"s"+(i+1), cat:"Servicios", ...s })),
+    clientas: clientas.map((c,i) => ({ id:"c"+(i+1), email:"", notas:"", wa:true, ...c })),
+    citas: citas.map((x,i) => ({ id:"a"+(i+1), fecha:dias[x[0]], hora:x[1], clientaId:"c"+x[2], servicioId:"s"+x[3],
+      estado:x[4] || "agendada", recordado:!!x[5], nueva:false })),
+    seq: 100
+  };
+}
+function nuevoNegocio(id, cfg, planKey, pagadoHasta, opts, servicios, clientas, citas, pagos){
+  return { id, cfg, data:crearDatos(cfg, servicios, clientas, citas),
+    plan:{ plan:planKey, pagadoHasta, prueba:!!opts.prueba, suspendido:false, alta:opts.alta || hoyISO() },
+    pagos:(pagos || []).map(f => ({ fecha:f, monto:PLANES[planKey].precio })) };
+}
+
+const NEGOCIOS = [];
+(function seed(){
+  const c1 = cfgBase({ nombre:"Studio Carla", rubro:"Peluquería y manicure", direccion:"Av. Ejemplo 1234, local 5", correoNegocio:"reservas@studiocarla.cl" });
+  NEGOCIOS.push(nuevoNegocio("n1", c1, "pro", masDias(18), { alta:masDias(-72) }, [
+      { nombre:"Corte de pelo", cat:"Peluquería", dur:45, precio:15000 },
+      { nombre:"Corte + brushing", cat:"Peluquería", dur:60, precio:22000 },
+      { nombre:"Tintura completa", cat:"Peluquería", dur:120, precio:45000 },
+      { nombre:"Mechas / balayage", cat:"Peluquería", dur:150, precio:65000 },
+      { nombre:"Manicure semipermanente", cat:"Uñas", dur:60, precio:14000 },
+      { nombre:"Pedicure spa", cat:"Uñas", dur:60, precio:16000 }
+    ], [
+      { nombre:"Valentina Rojas", tel:"987654321", email:"valentina.r@ejemplo.cl", notas:"Prefiere tintes sin amoníaco" },
+      { nombre:"Camila Fuentes",  tel:"955550102" },
+      { nombre:"Fernanda Muñoz",  tel:"944440303", email:"fer.munoz@ejemplo.cl", wa:false, notas:"Avisar por llamada" },
+      { nombre:"Josefa Díaz",     tel:"933330404", notas:"Uñas cortas, tonos nude" },
+      { nombre:"Antonia Soto",    tel:"922220505", email:"antonia.soto@ejemplo.cl", notas:"Primera visita por Instagram" }
+    ], [
+      [0,"10:00",1,3,"confirmada",1],[0,"12:30",2,1],[0,"15:00",4,5],[0,"17:00",3,2,"confirmada"],
+      [1,"11:00",5,4],[1,"16:00",2,6],[2,"10:30",4,2],[2,"14:00",1,5,"confirmada"],[3,"12:00",5,1]
+    ], [masDias(-72), masDias(-42), masDias(-12)]));
+
+  const c2 = cfgBase({ nombre:"Uñas Bella", rubro:"Manicure y pedicure", direccion:"Pasaje Ejemplo 45", apertura:"11:00", cierre:"20:00", color:"#7b3fa0", correoNegocio:"hola@unasbella.cl" });
+  NEGOCIOS.push(nuevoNegocio("n2", c2, "basico", masDias(3), { alta:masDias(-58) }, [
+      { nombre:"Manicure tradicional", cat:"Manos", dur:45, precio:9000 },
+      { nombre:"Manicure semipermanente", cat:"Manos", dur:60, precio:14000 },
+      { nombre:"Uñas acrílicas", cat:"Manos", dur:120, precio:25000 },
+      { nombre:"Pedicure", cat:"Pies", dur:60, precio:15000 }
+    ], [
+      { nombre:"Martina Leiva", tel:"966661010" }, { nombre:"Isidora Paz", tel:"977772020" }, { nombre:"Constanza Vera", tel:"988883030" }
+    ], [[0,"11:00",1,2,"confirmada"],[0,"15:00",2,3],[1,"12:00",3,1],[2,"17:00",1,4]], [masDias(-58), masDias(-27)]));
+
+  const c3 = cfgBase({ nombre:"Peluquería Rizos", rubro:"Peluquería", direccion:"Calle Ejemplo 890", color:"#00897b", correoNegocio:"contacto@rizos.cl" });
+  NEGOCIOS.push(nuevoNegocio("n3", c3, "basico", masDias(-2), { alta:masDias(-95) }, [
+      { nombre:"Corte", cat:"Peluquería", dur:45, precio:12000 },
+      { nombre:"Corte + lavado", cat:"Peluquería", dur:60, precio:15000 },
+      { nombre:"Tintura", cat:"Color", dur:120, precio:38000 }
+    ], [{ nombre:"Paula Contreras", tel:"912340001" }, { nombre:"Javiera Lagos", tel:"912340002" }],
+    [[0,"10:00",1,1],[1,"13:00",2,3]], [masDias(-95), masDias(-63), masDias(-32)]));
+
+  const c4 = cfgBase({ nombre:"Luna Nails", rubro:"Uñas y nail art", direccion:"Av. Ejemplo 77, of. 3", color:"#2e6bd1", correoNegocio:"hola@lunanails.cl" });
+  NEGOCIOS.push(nuevoNegocio("n4", c4, "basico", masDias(9), { prueba:true, alta:masDias(-5) }, [
+      { nombre:"Esmaltado gel", cat:"Uñas", dur:60, precio:13000 },
+      { nombre:"Kapping", cat:"Uñas", dur:90, precio:18000 },
+      { nombre:"Nail art (adicional)", cat:"Uñas", dur:30, precio:5000 }
+    ], [{ nombre:"Catalina Ruiz", tel:"923450001" }], [[1,"16:00",1,2]], []));
+
+  const c5 = cfgBase({ nombre:"Barbería Norte", rubro:"Barbería", direccion:"Av. Ejemplo 2020", color:"#2b2530", correoNegocio:"barberianorte@ejemplo.cl" });
+  NEGOCIOS.push(nuevoNegocio("n5", c5, "basico", masDias(-9), { alta:masDias(-130) }, [
+      { nombre:"Corte caballero", cat:"Barbería", dur:30, precio:9000 },
+      { nombre:"Corte + barba", cat:"Barbería", dur:45, precio:13000 }
+    ], [{ nombre:"Tomás Reyes", tel:"934560001" }], [[0,"18:00",1,2]], [masDias(-130), masDias(-99), masDias(-69), masDias(-40)]));
+})();
+
+const CUENTAS = [
+  { email:"admin@tucita.cl",       pass:"demo1234", tipo:"super" },
+  { email:"carla@studiocarla.cl",  pass:"demo1234", tipo:"admin", negocioId:"n1" },
+  { email:"bella@unasbella.cl",    pass:"demo1234", tipo:"admin", negocioId:"n2" },
+  { email:"contacto@rizos.cl",     pass:"demo1234", tipo:"admin", negocioId:"n3" },
+  { email:"hola@lunanails.cl",     pass:"demo1234", tipo:"admin", negocioId:"n4" },
+  { email:"barberianorte@ejemplo.cl", pass:"demo1234", tipo:"admin", negocioId:"n5" }
+];
+const AVISOS = []; // "Ya pagué" informados por las admins
+
+function estadoPlan(n){
+  if (n.plan.suspendido) return "suspendido";
+  const d = diasHasta(n.plan.pagadoHasta);
+  if (d < -GRACIA) return "vencido";
+  if (d < 0) return "gracia";
+  if (n.plan.prueba) return "prueba";
+  if (d <= AVISO_PREVIO) return "por_vencer";
+  return "activo";
+}
+const bloqueado = e => e === "vencido" || e === "suspendido";
+const ESTADOS = {
+  activo:["confirmada","Al día"], prueba:["info","En prueba"], por_vencer:["agendada","Vence pronto"],
+  gracia:["cancelada","Vencido · en gracia"], vencido:["cancelada","Vencido · bloqueado"], suspendido:["info","Suspendido"]
+};
+const pillEstado = e => `<span class="pill ${ESTADOS[e][0]}">${ESTADOS[e][1]}</span>`;
+const negocio = id => NEGOCIOS.find(n => n.id === id);
+const cuentaDe = id => CUENTAS.find(c => c.negocioId === id);
+
+/* ---------- Negocio actual (el que se está mirando) ---------- */
+let ACTUAL, NEGOCIO, S;
+function usar(id){ ACTUAL = negocio(id); NEGOCIO = ACTUAL.cfg; S = ACTUAL.data; aplicarMarca(NEGOCIO); }
+const proximosDias = n => proximosDiasDe(NEGOCIO, n);
+
+const servicio = id => S.servicios.find(s => s.id === id);
+const clienta  = id => S.clientas.find(c => c.id === id);
+const finCita  = c => toHora(toMin(c.hora) + servicio(c.servicioId).dur);
+const activasDe = f => S.citas.filter(c => c.fecha === f && c.estado !== "cancelada");
+
+function horasLibres(fecha, servicioId){
+  const dur = servicio(servicioId).dur;
+  const ini = toMin(NEGOCIO.apertura), fin = toMin(NEGOCIO.cierre);
+  const ocupadas = activasDe(fecha).map(c => [toMin(c.hora), toMin(c.hora) + servicio(c.servicioId).dur]);
+  let minimo = ini;
+  if (fecha === hoyISO()){ const n = new Date(); minimo = Math.max(ini, n.getHours()*60 + n.getMinutes() + 30); }
+  const out = [];
+  for (let t = ini; t + dur <= fin; t += 30){
+    if (t < minimo) continue;
+    if (ocupadas.some(([a,b]) => t < b && t + dur > a)) continue;
+    out.push(toHora(t));
+  }
+  return out;
+}
+function minutosLibres(fecha){
+  const ini = toMin(NEGOCIO.apertura), fin = toMin(NEGOCIO.cierre);
+  const ocupado = activasDe(fecha).reduce((t,c) => {
+    const a = Math.max(ini, toMin(c.hora)), b = Math.min(fin, toMin(c.hora) + servicio(c.servicioId).dur);
+    return t + Math.max(0, b - a);
+  }, 0);
+  return Math.max(0, fin - ini - ocupado);
+}
+
+/* Mensajes */
+const primerNombre = c => clienta(c.clientaId).nombre.split(" ")[0];
+function msgRecordatorio(c){
+  return `Hola ${primerNombre(c)} 👋 Te recordamos tu hora de ${servicio(c.servicioId).nombre} en ${NEGOCIO.nombre} el ${fechaLarga(c.fecha)} a las ${c.hora}. ` +
+         `Responde SÍ para confirmar o NO si necesitas cancelar. ¡Te esperamos!`;
+}
+function msgConfirmacion(c){
+  return `¡Hola ${primerNombre(c)}! ✅ Tu hora en ${NEGOCIO.nombre} quedó reservada.\n\n` +
+         `📅 ${fechaLarga(c.fecha)}\n🕐 ${c.hora} a ${finCita(c)}\n✂️ ${servicio(c.servicioId).nombre} · ${clp.format(servicio(c.servicioId).precio)}\n📍 ${NEGOCIO.direccion}\n\n` +
+         `Si necesitas cambiar o cancelar, responde este mensaje.`;
+}
+const linkWhatsApp = c => `https://wa.me/56${clienta(c.clientaId).tel}?text=${encodeURIComponent(msgRecordatorio(c))}`;
+
+/* ---------- Estado de la interfaz ---------- */
+const UI = {
+  vista: "usuaria",
+  publico: "n1",
+  sesion: null,            // null | {tipo:"admin", negocioId, soporte?} | {tipo:"super"}
+  login: { email:"", pass:"", error:"", info:"" },
+  reserva: { paso:1, servicioId:null, fecha:null, hora:null, nombre:"", tel:"", email:"", wa:true, error:"", ultima:null },
+  tab: "agenda",
+  modo: "semana",
+  diaPanel: null,
+  buscar: "",
+  resaltar: null,
+  copiado: false,
+  guardado: false,
+  campana: false,
+  invitacion: null,
+  saError: ""
+};
+const resetReserva = () => Object.assign(UI.reserva, { paso:1, servicioId:null, fecha:null, hora:null, error:"", ultima:null });
+
+/* ---------- Marca (color, logo, fondo) ---------- */
+function aplicarMarca(cfg){
+  const st = document.documentElement.style;
+  if (cfg && cfg.color){ st.setProperty("--accent", cfg.color); st.setProperty("--accent-ink", inkFor(cfg.color)); }
+  else { st.removeProperty("--accent"); st.removeProperty("--accent-ink"); }
+  st.setProperty("--bg-op", cfg ? cfg.fondoOp : 0.14);
+  const f = document.getElementById("fondo");
+  if (cfg && cfg.fondo){ f.style.backgroundImage = `url("${cfg.fondo}")`; f.style.backgroundSize = "cover"; f.style.backgroundRepeat = "no-repeat"; }
+  else { f.style.backgroundImage = `url("${PATRON}")`; f.style.backgroundSize = "260px"; f.style.backgroundRepeat = "repeat"; }
+}
+const logoDe = (cfg, cls = "") => `<div class="logo ${cls}">${cfg.logo ? `<img src="${cfg.logo}" alt="Logo de ${esc(cfg.nombre)}">` : esc(iniciales(cfg.nombre))}</div>`;
+const logoHTML = () => logoDe(NEGOCIO);
+const bizHeader = () => `<div class="biz">${logoHTML()}
+  <div><h1>${esc(NEGOCIO.nombre)}</h1><p>${esc(NEGOCIO.rubro)} · ${esc(NEGOCIO.direccion)}</p></div></div>`;
+
+/* ---------- Avisos tipo notificación del celular ---------- */
+function toast(html){
+  const box = document.getElementById("toasts");
+  const el = document.createElement("div");
+  el.className = "toast"; el.setAttribute("role", "status");
+  el.innerHTML = `<div class="dot">✓</div><div class="tbody">${html}</div><button class="tclose" aria-label="Cerrar aviso">×</button>`;
+  el.querySelector(".tclose").onclick = () => el.remove();
+  box.appendChild(el);
+  setTimeout(() => el.remove(), 8000);
+}
+
+/* ---------- Login ---------- */
+function loginHTML(){
+  const L = UI.login;
+  const demo = CUENTAS.map(c => {
+    const etiqueta = c.tipo === "super" ? "Superadmin (tú)" : negocio(c.negocioId).cfg.nombre;
+    const est = c.tipo === "super" ? "" : ESTADOS[estadoPlan(negocio(c.negocioId))][1];
+    return `<button type="button" data-action="demo" data-email="${esc(c.email)}"><b>${esc(etiqueta)}</b><span>${esc(est)}</span></button>`;
+  }).join("");
+  return `<form class="login" id="formLogin" novalidate>
+    <div class="brandbig"><span class="dot">✓</span>TUCITA</div>
+    <div><h2 style="font-size:20px">Entra a tu panel</h2><p>Para dueñas y personal de cada negocio.</p></div>
+    <div class="field"><label for="lgEmail">Correo</label><input id="lgEmail" type="email" autocomplete="username" value="${esc(L.email)}" placeholder="tu@negocio.cl"></div>
+    <div class="field"><label for="lgPass">Contraseña</label><input id="lgPass" type="password" autocomplete="current-password" value="${esc(L.pass)}" placeholder="••••••••"></div>
+    ${L.error ? `<div class="err" role="alert">${esc(L.error)}</div>` : ""}
+    ${L.info ? `<div class="info" role="status">${esc(L.info)}</div>` : ""}
+    <button class="btn btn-primary" type="button" data-action="enviar">Entrar</button>
+    <button class="link" type="button" data-action="olvide" style="align-self:center">¿Olvidaste tu contraseña?</button>
+    <div class="or">o</div>
+    <button class="btn btn-google" type="button" data-action="google"><span class="g"></span>Entrar con Google</button>
+    <div class="demo"><b>Cuentas de prueba (contraseña: demo1234)</b>${demo}</div>
+  </form>`;
+}
+function entrar(){
+  const L = UI.login;
+  const email = L.email.trim().toLowerCase();
+  const cuenta = CUENTAS.find(c => c.email === email);
+  if (!email || !L.pass) { L.error = "Escribe tu correo y tu contraseña."; L.info = ""; return render(); }
+  if (!cuenta || cuenta.pass !== L.pass) { L.error = "El correo o la contraseña no coinciden. Revisa e intenta de nuevo."; L.info = ""; return render(); }
+  UI.login = { email:"", pass:"", error:"", info:"" };
+  UI.tab = "agenda"; UI.diaPanel = null; UI.campana = false;
+  if (cuenta.tipo === "super"){ UI.sesion = { tipo:"super" }; return setVista("super"); }
+  UI.sesion = { tipo:"admin", negocioId:cuenta.negocioId };
+  setVista("admin");
+}
+
+/* ---------- Vista usuaria ---------- */
+function renderUsuaria(){
+  usar(UI.publico);
+  const R = UI.reserva, root = document.getElementById("vistaUsuaria");
+  const barra = `<div class="demo-bar"><label for="selNeg">Prototipo · ver el link de reservas de</label>
+    <select id="selNeg">${NEGOCIOS.map(n => `<option value="${n.id}" ${n.id===UI.publico ? "selected" : ""}>${esc(n.cfg.nombre)}</option>`).join("")}</select></div>`;
+
+  if (bloqueado(estadoPlan(ACTUAL))){
+    const wa = `https://wa.me/56${NEGOCIO.telNegocio}`;
+    root.innerHTML = `${barra}<div class="phone">${bizHeader()}<div class="pane">
+      <h2>Las reservas en línea están pausadas por ahora</h2>
+      <p class="muted" style="margin:0">Para agendar, escríbele directamente a ${esc(NEGOCIO.nombre)} por WhatsApp al ${fmtTel(NEGOCIO.telNegocio)}.</p>
+      <a class="btn btn-wa" href="${wa}" target="_blank" rel="noopener">Escribir por WhatsApp</a>
+      <p class="muted" style="margin:0;font-size:12.5px">La clienta no ve el motivo. Esto aparece cuando el plan del negocio está vencido o suspendido.</p>
+    </div></div>`;
+    return;
+  }
+  if (R.paso === 5) return renderExito(root, barra);
+
+  const pasos = ["Servicio","Día","Hora","Tus datos"];
+  const prog = `<div class="progress">${pasos.map((p,i) =>
+      `<div class="${i+1 < R.paso ? "done" : i+1 === R.paso ? "now" : ""}">${p}</div>`).join("")}</div>`;
+  let body = "";
+  if (R.paso === 1){
+    const cats = [...new Set(S.servicios.map(s => s.cat))];
+    body = `<h2>¿Qué te quieres hacer?</h2>` + cats.map(cat => `
+      <div class="cat">${esc(cat)}</div>
+      ${S.servicios.filter(s => s.cat === cat).map(s => `
+        <button class="svc" data-action="pick-svc" data-id="${s.id}">
+          <div><strong>${esc(s.nombre)}</strong><span>${s.dur} min</span></div>
+          <div class="price num">${clp.format(s.precio)}</div>
+        </button>`).join("")}`).join("");
+  }
+  if (R.paso === 2){
+    const dias = proximosDias(12);
+    body = `<button class="link back" data-action="back">← Cambiar servicio</button>
+      <h2>Elige el día</h2>
+      <p class="muted" style="margin:0">${esc(servicio(R.servicioId).nombre)} · ${servicio(R.servicioId).dur} min</p>
+      ${dias.length ? `<div class="days">${dias.map(f => { const d = parseISO(f); return `
+        <button class="day" data-action="pick-day" data-f="${f}">
+          <small>${d.toLocaleDateString("es-CL",{weekday:"short"})}</small>
+          <b class="num">${d.getDate()}</b>
+          <small>${d.toLocaleDateString("es-CL",{month:"short"})}</small>
+        </button>`; }).join("")}</div>` : `<div class="empty">El local no tiene días de atención configurados.</div>`}`;
+  }
+  if (R.paso === 3){
+    const libres = horasLibres(R.fecha, R.servicioId);
+    body = `<button class="link back" data-action="back">← Cambiar día</button>
+      <h2>Elige la hora</h2>
+      <p class="muted cap" style="margin:0">${fechaLarga(R.fecha)}</p>
+      ${libres.length ? `<div class="slots">${libres.map(h => `<button class="slot num" data-action="pick-hora" data-h="${h}">${h}</button>`).join("")}</div>`
+                      : `<div class="empty">No quedan horas libres este día para este servicio. Prueba con otro día.</div>`}`;
+  }
+  if (R.paso === 4){
+    const sv = servicio(R.servicioId);
+    body = `<button class="link back" data-action="back">← Cambiar hora</button>
+      <h2>Tus datos</h2>
+      <div class="summary"><b>${esc(sv.nombre)}</b>
+        <span class="cap">${fechaLarga(R.fecha)} · ${R.hora} a ${toHora(toMin(R.hora)+sv.dur)}</span>
+        <span class="num">${clp.format(sv.precio)} · se paga en el local</span></div>
+      <form id="formReserva" class="pane" style="padding:0" novalidate>
+        <div class="field"><label for="inNombre">Nombre y apellido</label>
+          <input id="inNombre" autocomplete="name" value="${esc(R.nombre)}" placeholder="Ej: Daniela Pérez"></div>
+        <div class="field"><label for="inTel">Celular</label>
+          <div class="phonein"><span>+56</span><input id="inTel" inputmode="numeric" autocomplete="tel-national" maxlength="9" value="${esc(R.tel)}" placeholder="9 1234 5678"></div></div>
+        <div class="field"><label for="inEmail">Correo (opcional)</label>
+          <input id="inEmail" type="email" autocomplete="email" value="${esc(R.email)}" placeholder="tu@correo.cl">
+          <span class="hint">Si lo dejas, también te llega la confirmación por correo.</span></div>
+        <label class="check" for="inWa"><input type="checkbox" id="inWa" ${R.wa ? "checked" : ""}>
+          <span>Acepto recibir la confirmación y el recordatorio de mi hora por WhatsApp.</span></label>
+        ${R.error ? `<div class="err" role="alert">${esc(R.error)}</div>` : ""}
+        <button class="btn btn-primary" type="button" data-action="enviar">Confirmar reserva</button>
+      </form>`;
+  }
+  root.innerHTML = `${barra}<div class="phone">${bizHeader()}${prog}<div class="pane">${body}</div></div>`;
+}
+
+function renderExito(root, barra){
+  const R = UI.reserva;
+  const c = S.citas.find(x => x.id === R.ultima), sv = servicio(c.servicioId), cl = clienta(c.clientaId);
+  const asunto = `Tu hora en ${NEGOCIO.nombre} está reservada · ${fechaCorta(c.fecha)}, ${c.hora}`;
+  const wa = cl.wa ? `
+    <div class="preview-title">Así le llega por WhatsApp</div>
+    <div class="wa-chat"><div class="who">${esc(NEGOCIO.nombre)} · WhatsApp</div>
+      <div class="bubble">${esc(msgConfirmacion(c))}<small>${new Date().toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"})}</small></div></div>` : "";
+  const mail = cl.email ? `
+    <div class="preview-title">Así le llega por correo</div>
+    <div class="mail"><div class="mhead"><span><b>De:</b> ${esc(NEGOCIO.nombre)} &lt;${esc(NEGOCIO.correoNegocio)}&gt;</span>
+      <span><b>Para:</b> ${esc(cl.email)}</span><span><b>Asunto:</b> ${esc(asunto)}</span></div>
+      <div class="mbody"><div class="mbrand">${logoHTML()}${esc(NEGOCIO.nombre)}</div>${esc(msgConfirmacion(c).replace(/[✅📅🕐✂📍]️?\s?/gu, ""))}</div></div>` : "";
+  root.innerHTML = `${barra}<div class="phone">${bizHeader()}
+    <div class="success">
+      <div class="tick">✓</div>
+      <h2>¡Listo, ${esc(cl.nombre.split(" ")[0])}! Tu hora quedó reservada</h2>
+      <div class="summary"><b>${esc(sv.nombre)}</b>
+        <span class="cap">${fechaLarga(c.fecha)} · ${c.hora}</span>
+        <span>${esc(NEGOCIO.direccion)}</span></div>
+      ${wa}${mail}
+      ${!cl.wa && !cl.email ? `<div class="empty">Esta clienta no dejó correo ni autorizó WhatsApp, así que no recibe confirmación.</div>` : ""}
+      <p class="muted" style="margin:0;font-size:12.5px;text-align:center">En el prototipo son vistas previas. En la versión real se envían solos al confirmar la reserva.</p>
+      <button class="btn btn-primary" data-action="ver-en-panel">Ver cómo le llega a la admin →</button>
+      <button class="link" data-action="nueva">Hacer otra reserva</button>
+    </div></div>`;
+}
+
+function confirmarReserva(){
+  const R = UI.reserva;
+  const nombre = R.nombre.trim().replace(/\s+/g, " ");
+  const tel = R.tel.replace(/\D/g, "");
+  const email = R.email.trim();
+  if (nombre.length < 3) { R.error = "Escribe tu nombre para que el local sepa quién eres."; return renderUsuaria(); }
+  if (!/^9\d{8}$/.test(tel)) { R.error = "El celular debe tener 9 dígitos y empezar con 9 (ej: 912345678)."; return renderUsuaria(); }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { R.error = "Revisa el correo, parece incompleto (ej: nombre@correo.cl)."; return renderUsuaria(); }
+  if (!horasLibres(R.fecha, R.servicioId).includes(R.hora)) { R.error = "Esa hora se acaba de ocupar. Vuelve y elige otra."; return renderUsuaria(); }
+  let cl = S.clientas.find(c => c.tel === tel);
+  if (!cl){ cl = { id:"c" + (++S.seq), nombre, tel, email, wa:R.wa, notas:"Registrada por el link de reservas" }; S.clientas.push(cl); }
+  else { cl.wa = R.wa; if (email) cl.email = email; }
+  const cita = { id:"a" + (++S.seq), clientaId:cl.id, servicioId:R.servicioId, fecha:R.fecha, hora:R.hora, estado:"agendada", recordado:false, nueva:true };
+  S.citas.push(cita);
+  Object.assign(R, { paso:5, error:"", ultima:cita.id });
+  renderUsuaria();
+  toast(`<b>Nueva reserva · ${esc(NEGOCIO.nombre)}</b><br>${esc(cl.nombre)} · ${esc(servicio(cita.servicioId).nombre)}<br><span class="cap" style="display:inline-block">${fechaCorta(cita.fecha)}</span>, ${cita.hora}
+    <small>Así le llega el aviso al celular de la admin.</small>`);
+}
+
+/* ---------- Vista admin ---------- */
+function renderAdmin(){
+  const root = document.getElementById("vistaAdmin");
+  if (!UI.sesion || UI.sesion.tipo !== "admin"){
+    aplicarMarca(null);
+    root.innerHTML = (UI.sesion && UI.sesion.tipo === "super")
+      ? `<div class="login"><h2 style="font-size:20px">Estás conectado como Superadmin</h2>
+          <p>Para ver el panel de una peluquería, entra desde Superadmin con el botón "Entrar como admin".</p>
+          <button class="btn btn-primary" data-action="view" data-view="super">Ir a Superadmin</button>
+          <button class="link" data-action="logout">Cerrar sesión</button></div>`
+      : loginHTML();
+    return;
+  }
+  usar(UI.sesion.negocioId);
+  if (!UI.diaPanel || !proximosDias(7).includes(UI.diaPanel)) UI.diaPanel = proximosDias(1)[0] || hoyISO();
+  const est = estadoPlan(ACTUAL);
+  const soporte = UI.sesion.soporte ? `<div class="banner neutral"><span>Estás viendo el panel de <b>${esc(NEGOCIO.nombre)}</b> como Superadmin (modo soporte).</span>
+      <button class="btn btn-sm" data-action="volver-super">Volver a Superadmin</button></div>` : "";
+
+  if (bloqueado(est)){ root.innerHTML = soporte + bloqueadoHTML(est); return; }
+
+  const tabs = [["agenda","Agenda y disponibilidad"],["clientas","Clientas"],["servicios","Servicios"],["personalizar","Personalizar"],["link","Link de reservas"],["plan","Mi plan"]];
+  const bodies = { agenda:agendaHTML, clientas:clientasHTML, servicios:serviciosHTML, personalizar:personalizarHTML, link:linkHTML, plan:planHTML };
+  const nDias = NEGOCIO.dias.length;
+  root.innerHTML = `<div class="adminbox">${soporte}
+    <div class="panel-head">${logoHTML()}<div class="grow"><h1>${esc(NEGOCIO.nombre)}</h1>
+      <p>Admin · horario ${NEGOCIO.apertura}–${NEGOCIO.cierre} · ${plural(nDias, "día", "días")} de atención a la semana</p></div>
+      <div class="head-actions">${campanaHTML()}<button class="btn btn-sm" data-action="logout">Cerrar sesión</button></div></div>
+    ${bannerPlan(est)}
+    <div class="tabs" role="tablist">${tabs.map(([k,l]) =>
+      `<button role="tab" aria-selected="${UI.tab===k}" data-action="tab" data-tab="${k}">${l}</button>`).join("")}</div>
+    ${bodies[UI.tab]()}</div>`;
+  if (UI.tab === "clientas") actualizarConteo();
+}
+
+function campanaHTML(){
+  const nuevas = S.citas.filter(c => c.nueva).sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  const drop = UI.campana ? `<div class="dropdown" role="menu">
+      ${nuevas.length ? nuevas.map(c => `<button class="ditem" data-action="ver-nueva" data-id="${c.id}" data-f="${c.fecha}">
+          <b>${esc(clienta(c.clientaId).nombre)}</b> reservó ${esc(servicio(c.servicioId).nombre)}
+          <span class="cap">${fechaCorta(c.fecha)} · ${c.hora}</span></button>`).join("")
+        : `<div class="ditem muted" style="cursor:default">No tienes reservas nuevas. Cuando alguien reserve por tu link, aparece aquí.</div>`}
+      ${nuevas.length ? `<div class="dfoot"><span class="muted">${plural(nuevas.length, "reserva nueva", "reservas nuevas")}</span>
+        <button class="link" data-action="vistas">Marcar como vistas</button></div>` : ""}
+    </div>` : "";
+  return `<div class="bell"><button class="btn btn-sm" data-action="campana" aria-expanded="${UI.campana}" aria-label="Reservas nuevas">🔔 Nuevas</button>
+    ${nuevas.length ? `<span class="badge num">${nuevas.length}</span>` : ""}</div>${drop}`;
+}
+
+function bannerPlan(est){
+  const d = diasHasta(ACTUAL.plan.pagadoHasta);
+  if (est === "prueba") return `<div class="banner neutral"><span>Estás en tu prueba gratis: te ${d === 1 ? "queda 1 día" : `quedan ${d} días`} (hasta el ${fechaMedia(ACTUAL.plan.pagadoHasta)}).</span>
+    <button class="btn btn-sm btn-primary" data-action="tab" data-tab="plan">Ver cómo contratar</button></div>`;
+  if (est === "por_vencer") return `<div class="banner warn"><span>Tu plan vence el ${fechaMedia(ACTUAL.plan.pagadoHasta)} (${d === 0 ? "hoy" : `en ${plural(d, "día", "días")}`}). Renueva para no cortar tus reservas.</span>
+    <button class="btn btn-sm" data-action="tab" data-tab="plan">Cómo pagar</button></div>`;
+  if (est === "gracia"){
+    const quedan = GRACIA + d;
+    return `<div class="banner bad"><span>Tu plan venció el ${fechaMedia(ACTUAL.plan.pagadoHasta)}. Tienes ${plural(quedan, "día", "días")} para renovar antes de que se pausen las reservas en línea.</span>
+    <button class="btn btn-sm" data-action="tab" data-tab="plan">Renovar ahora</button></div>`;
+  }
+  return "";
+}
+
+function comoPagarHTML(){
+  const avisado = AVISOS.find(a => a.negocioId === ACTUAL.id);
+  return `<div class="field"><span class="lbl">Cómo pagar</span>
+      <span class="muted" style="font-size:14px">Transfiere la mensualidad a TUCITA y avísanos con el botón. Apenas confirmemos el pago, tu plan se extiende un mes.</span>
+      <div class="info">Aquí aparecerán los datos de transferencia de TUCITA (los configuras tú en tu panel de Superadmin).</div></div>
+    ${avisado ? `<div class="info" role="status">Aviso enviado. Te activamos apenas confirmemos el pago.</div>`
+              : `<button class="btn btn-primary" data-action="avisar-pago">Ya pagué, avisar a TUCITA</button>`}`;
+}
+
+function bloqueadoHTML(est){
+  const susp = est === "suspendido";
+  return `<div class="card pane blocked" style="padding:26px">
+    ${logoHTML()}
+    <h2>El plan de ${esc(NEGOCIO.nombre)} está ${susp ? "suspendido" : "vencido"}</h2>
+    <p class="muted" style="margin:0">${susp ? "TUCITA suspendió la cuenta. Escríbenos para revisarlo." : `Venció el ${fechaMedia(ACTUAL.plan.pagadoHasta)} y pasaron los ${GRACIA} días de gracia.`}
+      Tus reservas en línea están pausadas, pero tus clientas, citas y configuración están guardadas y vuelven a funcionar apenas se registre el pago.</p>
+    <div style="width:100%;text-align:left;display:flex;flex-direction:column;gap:10px">${comoPagarHTML()}</div>
+    <button class="link" data-action="logout">Cerrar sesión</button>
+  </div>`;
+}
+
+function planHTML(){
+  const p = ACTUAL.plan, pl = PLANES[p.plan], est = estadoPlan(ACTUAL), d = diasHasta(p.pagadoHasta);
+  const pagos = [...ACTUAL.pagos].reverse();
+  return `<div class="grid2">
+    <div class="card pane" style="padding:18px">
+      <h2>Plan ${pl.nombre} · <span class="num">${clp.format(pl.precio)}</span> al mes</h2>
+      <div>${pillEstado(est)}</div>
+      <div class="summary">
+        <span>${p.prueba ? "Prueba gratis hasta" : "Pagado hasta"}: <b class="cap" style="display:inline-block;font-size:15px">${fechaMedia(p.pagadoHasta)}</b></span>
+        <span class="muted">${d >= 0 ? `Quedan ${plural(d, "día", "días")}` : `Venció hace ${plural(-d, "día", "días")}`} · cliente desde el ${fechaMedia(p.alta)}</span>
+      </div>
+      ${comoPagarHTML()}
+    </div>
+    <div class="card pane" style="padding:18px">
+      <h2>Historial de pagos</h2>
+      ${pagos.length ? `<div class="tablewrap"><table><thead><tr><th>Fecha</th><th>Monto</th></tr></thead><tbody>
+        ${pagos.map(x => `<tr><td>${fechaMedia(x.fecha)}</td><td class="num">${clp.format(x.monto)}</td></tr>`).join("")}</tbody></table></div>`
+      : `<div class="empty">Todavía no hay pagos registrados.</div>`}
+    </div></div>`;
+}
+
+function agendaHTML(){
+  const toggle = `<div class="seg" role="group" aria-label="Vista de agenda">
+      <button data-action="modo" data-m="semana" aria-pressed="${UI.modo==="semana"}">Semana</button>
+      <button data-action="modo" data-m="dia" aria-pressed="${UI.modo==="dia"}">Día</button></div>`;
+  return UI.modo === "semana" ? semanaHTML(toggle) : diaHTML(toggle);
+}
+
+function semanaHTML(toggle){
+  const dias = proximosDias(6);
+  if (!dias.length) return `<div class="empty">Configura los días de atención en Personalizar.</div>`;
+  const ini = toMin(NEGOCIO.apertura), fin = toMin(NEGOCIO.cierre);
+  const PX = 30;
+  const alto = (fin - ini) / 30 * PX;
+  const todas = dias.flatMap(activasDe);
+  const porConfirmar = todas.filter(c => c.estado === "agendada").length;
+  const libresTot = dias.reduce((t,f) => t + minutosLibres(f), 0);
+  const ingresos = todas.reduce((t,c) => t + servicio(c.servicioId).precio, 0);
+  const tiles = `<div class="tiles">
+    <div class="tile"><small>Citas próximos ${dias.length} días</small><b class="num">${todas.length}</b></div>
+    <div class="tile ${porConfirmar ? "alert" : ""}"><small>Por confirmar</small><b class="num">${porConfirmar}</b></div>
+    <div class="tile"><small>Horas disponibles</small><b class="num">${(libresTot/60).toLocaleString("es-CL",{maximumFractionDigits:1})} h</b></div>
+    <div class="tile"><small>Ingreso estimado</small><b class="num">${clp.format(ingresos)}</b></div></div>`;
+  let times = "";
+  for (let t = ini; t <= fin; t += 60) times += `<span style="top:${(t-ini)/30*PX}px">${toHora(t)}</span>`;
+  const now = new Date(), nowMin = now.getHours()*60 + now.getMinutes();
+  const heads = dias.map(f => `<div class="whead ${f===hoyISO() ? "hoy" : ""}" data-action="ir-dia" data-f="${f}" role="button" tabindex="0">
+      <b>${f === hoyISO() ? "Hoy" : parseISO(f).toLocaleDateString("es-CL",{weekday:"short", day:"numeric"})}</b>
+      <span>${(minutosLibres(f)/60).toLocaleString("es-CL",{maximumFractionDigits:1})} h libres</span></div>`).join("");
+  const cols = dias.map(f => {
+    const bloques = activasDe(f).map(c => {
+      const top = (toMin(c.hora) - ini) / 30 * PX, h = servicio(c.servicioId).dur / 30 * PX - 3;
+      return `<button class="wblock ${c.estado}" style="top:${top+1}px;height:${h}px" data-action="ir-dia" data-f="${f}" data-id="${c.id}"
+        title="${esc(clienta(c.clientaId).nombre)} · ${esc(servicio(c.servicioId).nombre)}">
+        <b class="num">${c.hora} ${esc(primerNombre(c))}${c.nueva ? " · nueva" : ""}</b>${esc(servicio(c.servicioId).nombre)}</button>`;
+    }).join("");
+    const linea = f === hoyISO() && nowMin > ini && nowMin < fin ? `<div class="wnow" style="top:${(nowMin-ini)/30*PX}px"></div>` : "";
+    return `<div class="wcol" style="height:${alto}px;--hour:${PX*2}px">${bloques}${linea}</div>`;
+  }).join("");
+  return `${tiles}
+    <div class="agendabar"><h2 style="font-size:18px">Calendario de la semana</h2>${toggle}</div>
+    <div class="week"><div class="wgrid" style="grid-template-columns:56px repeat(${dias.length}, minmax(110px,1fr))">
+      <div class="wcorner"></div>${heads}
+      <div class="wtimes" style="height:${alto}px">${times}</div>${cols}
+    </div></div>
+    <div class="legend"><span><i style="background:var(--surface)"></i>Espacio libre (se puede reservar por el link)</span>
+      <span><i style="background:var(--accent-soft);border-left:3px solid var(--warn)"></i>Por confirmar</span>
+      <span><i style="background:var(--accent-soft);border-left:3px solid var(--ok)"></i>Confirmada</span>
+      <span>Toca un día o una cita para ver el detalle.</span></div>`;
+}
+
+function diaHTML(toggle){
+  const dias = proximosDias(7);
+  if (!dias.includes(UI.diaPanel)) dias.unshift(UI.diaPanel);
+  const delDia = S.citas.filter(c => c.fecha === UI.diaPanel).sort((a,b) => a.hora.localeCompare(b.hora));
+  const activas = delDia.filter(c => c.estado !== "cancelada");
+  const porConfirmar = activas.filter(c => c.estado === "agendada").length;
+  const pendientesRec = activas.filter(c => !c.recordado && clienta(c.clientaId).wa).length;
+  const tiles = `<div class="tiles">
+    <div class="tile"><small>Citas del día</small><b class="num">${activas.length}</b></div>
+    <div class="tile ${porConfirmar ? "alert" : ""}"><small>Por confirmar</small><b class="num">${porConfirmar}</b></div>
+    <div class="tile ${pendientesRec ? "alert" : ""}"><small>Recordatorios por enviar</small><b class="num">${pendientesRec}</b></div>
+    <div class="tile"><small>Horas libres</small><b class="num">${(minutosLibres(UI.diaPanel)/60).toLocaleString("es-CL",{maximumFractionDigits:1})} h</b></div></div>`;
+  const bar = `<div class="daybar">${dias.map(f => {
+    const n = activasDe(f).length;
+    return `<button class="dchip" aria-pressed="${f===UI.diaPanel}" data-action="dia" data-f="${f}">
+      <span class="cap">${f === hoyISO() ? "Hoy" : fechaCorta(f)}</span><span class="count num">${n}</span></button>`; }).join("")}</div>`;
+  const lista = delDia.length ? `<div class="list">${delDia.map(c => {
+    const cl = clienta(c.clientaId), sv = servicio(c.servicioId);
+    const wa = c.estado === "cancelada" ? "" : cl.wa
+      ? `<a class="btn btn-wa btn-sm" href="${linkWhatsApp(c)}" target="_blank" rel="noopener" data-action="wa" data-id="${c.id}">${c.recordado ? "Recordar de nuevo" : "Recordar por WhatsApp"}</a>`
+      : `<button class="btn btn-sm" disabled title="La clienta no autorizó WhatsApp">Sin autorización WhatsApp</button>`;
+    const conf = c.estado === "agendada" ? `<button class="btn btn-sm" data-action="estado" data-id="${c.id}" data-e="confirmada">Marcar confirmada</button>` : "";
+    const canc = c.estado !== "cancelada" ? `<button class="btn btn-sm" data-action="estado" data-id="${c.id}" data-e="cancelada">Cancelar</button>`
+                                          : `<button class="btn btn-sm" data-action="estado" data-id="${c.id}" data-e="agendada">Reactivar</button>`;
+    return `<div class="cita ${c.estado} ${UI.resaltar===c.id ? "nueva" : ""}">
+      <div class="hora num">${c.hora}<small>hasta ${finCita(c)}</small></div>
+      <div class="who"><b>${esc(cl.nombre)}</b>
+        <div>${esc(sv.nombre)} · ${clp.format(sv.precio)} · ${fmtTel(cl.tel)}</div>
+        <div class="pills"><span class="pill ${c.estado}">${{agendada:"Por confirmar",confirmada:"Confirmada",cancelada:"Cancelada"}[c.estado]}</span>
+          ${c.estado !== "cancelada" && cl.wa ? (c.recordado ? `<span class="pill sent">Recordatorio enviado</span>` : `<span class="pill info">Recordatorio pendiente</span>`) : ""}
+          ${c.nueva ? `<span class="pill info">Nueva · reservó por el link</span>` : ""}</div></div>
+      <div class="acts">${wa}${conf}${canc}</div></div>`; }).join("")}</div>`
+    : `<div class="empty">No hay citas este día. Todo el horario está disponible.</div>`;
+  return `${tiles}<div class="agendabar"><h2 class="cap" style="font-size:18px">${fechaLarga(UI.diaPanel)}</h2>${toggle}</div>${bar}${lista}`;
+}
+
+function clientasHTML(){
+  return `<div class="toolbar"><input id="inBuscar" type="search" placeholder="Buscar por nombre o celular" value="${esc(UI.buscar)}" aria-label="Buscar clienta">
+    <span class="muted num" id="totalClientas"></span></div><div class="tablewrap" id="tablaClientas">${tablaClientas()}</div>`;
+}
+function filtrarClientas(){
+  const q = UI.buscar.trim().toLowerCase(), qn = q.replace(/\D/g, "");
+  return S.clientas.filter(c => !q || c.nombre.toLowerCase().includes(q) || (qn && c.tel.includes(qn)));
+}
+function actualizarConteo(){
+  const el = document.getElementById("totalClientas");
+  if (el) el.textContent = `${filtrarClientas().length} de ${S.clientas.length} clientas`;
+}
+function tablaClientas(){
+  const filas = filtrarClientas(), hoy = hoyISO();
+  if (!filas.length) return `<div class="empty">${S.clientas.length ? "No hay clientas que coincidan con la búsqueda." : "Aún no hay clientas. Se agregan solas cuando reservan por tu link."}</div>`;
+  return `<table><thead><tr><th>Nombre</th><th>Celular</th><th>Correo</th><th>WhatsApp</th><th>Citas</th><th>Próxima cita</th><th>Notas</th></tr></thead><tbody>
+    ${filas.map(c => {
+      const suyas = S.citas.filter(a => a.clientaId === c.id && a.estado !== "cancelada");
+      const prox = suyas.filter(a => a.fecha >= hoy).sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora))[0];
+      return `<tr><td><b>${esc(c.nombre)}</b></td><td class="num">${fmtTel(c.tel)}</td><td>${esc(c.email) || "—"}</td>
+        <td><span class="pill ${c.wa ? "confirmada" : "cancelada"}">${c.wa ? "Autorizado" : "No"}</span></td>
+        <td class="num">${suyas.length}</td>
+        <td class="cap">${prox ? `${fechaCorta(prox.fecha)} · ${prox.hora}` : "—"}</td>
+        <td class="notes">${esc(c.notas) || "—"}</td></tr>`; }).join("")}
+    </tbody></table>`;
+}
+
+function serviciosHTML(){
+  return `<div class="grid2">
+    <div class="tablewrap"><table><thead><tr><th>Servicio</th><th>Categoría</th><th>Duración</th><th>Precio</th></tr></thead><tbody>
+      ${S.servicios.map(s => `<tr><td><b>${esc(s.nombre)}</b></td><td>${esc(s.cat)}</td><td class="num">${s.dur} min</td><td class="num">${clp.format(s.precio)}</td></tr>`).join("")}
+    </tbody></table></div>
+    <form class="card pane" id="formServicio" style="padding:16px" novalidate>
+      <h2>Agregar servicio</h2>
+      <div class="field"><label for="svNombre">Nombre</label><input id="svNombre" placeholder="Ej: Alisado permanente"></div>
+      <div class="field"><label for="svCat">Categoría</label><input id="svCat" placeholder="Peluquería, Uñas, Cejas…"></div>
+      <div class="formrow">
+        <div class="field"><label for="svDur">Duración (min)</label><input id="svDur" type="number" min="15" step="15" value="60"></div>
+        <div class="field"><label for="svPrecio">Precio ($)</label><input id="svPrecio" type="number" min="0" step="500" placeholder="20000"></div>
+      </div>
+      <div id="svErr"></div>
+      <button class="btn btn-primary" type="button" data-action="enviar">Agregar</button>
+      <p class="muted" style="margin:0;font-size:13px">Aparece al tiro en el link de reservas.</p>
+    </form></div>`;
+}
+
+const COLORES = [["#c2185b","Fucsia"],["#7b3fa0","Morado"],["#00897b","Turquesa"],["#2e6bd1","Azul"],["#b07a1a","Dorado"],["#2b2530","Negro"]];
+function personalizarHTML(){
+  const horas = []; for (let t = 6*60; t <= 22*60; t += 30) horas.push(toHora(t));
+  const opts = sel => horas.map(h => `<option ${h===sel ? "selected" : ""}>${h}</option>`).join("");
+  const nombresDias = [[1,"Lun"],[2,"Mar"],[3,"Mié"],[4,"Jue"],[5,"Vie"],[6,"Sáb"],[0,"Dom"]];
+  return `<div class="grid2">
+    <form class="card pane" id="formMarca" style="padding:18px" novalidate>
+      <h2>Datos del negocio</h2>
+      <div class="field"><label for="pNombre">Nombre del negocio</label><input id="pNombre" value="${esc(NEGOCIO.nombre)}"></div>
+      <div class="field"><label for="pRubro">Rubro o frase corta</label><input id="pRubro" value="${esc(NEGOCIO.rubro)}"></div>
+      <div class="field"><label for="pDir">Dirección</label><input id="pDir" value="${esc(NEGOCIO.direccion)}"></div>
+      <div class="formrow">
+        <div class="field"><label for="pTel">WhatsApp del negocio</label><div class="phonein"><span>+56</span><input id="pTel" inputmode="numeric" maxlength="9" value="${esc(NEGOCIO.telNegocio)}"></div></div>
+        <div class="field"><label for="pMail">Correo del negocio</label><input id="pMail" type="email" value="${esc(NEGOCIO.correoNegocio)}"></div>
+      </div>
+      <div class="formrow">
+        <div class="field"><label for="pAbre">Abre</label><select id="pAbre">${opts(NEGOCIO.apertura)}</select></div>
+        <div class="field"><label for="pCierra">Cierra</label><select id="pCierra">${opts(NEGOCIO.cierre)}</select></div>
+      </div>
+      <div class="field"><span class="lbl">Días de atención</span>
+        <div class="daysel">${nombresDias.map(([n,l]) => `<label><input type="checkbox" class="pDia" value="${n}" ${NEGOCIO.dias.includes(n) ? "checked" : ""}>${l}</label>`).join("")}</div></div>
+      <div id="pErr"></div>
+      <button class="btn btn-primary" type="button" data-action="enviar">${UI.guardado ? "¡Guardado!" : "Guardar datos"}</button>
+    </form>
+    <div class="card pane" style="padding:18px">
+      <h2>Imagen del negocio</h2>
+      <div class="field"><span class="lbl">Color principal</span>
+        <div class="swatches">${COLORES.map(([c,l]) => `<button class="sw" style="background:${c}" title="${l}" aria-label="${l}" aria-pressed="${NEGOCIO.color===c}" data-action="color" data-c="${c}"></button>`).join("")}
+          <label class="hint" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="color" class="sw-custom" id="pColor" value="${NEGOCIO.color || "#c2185b"}">Otro color</label></div></div>
+      <div class="field"><span class="lbl">Logo</span>
+        <div class="upload"><div class="thumb" style="${NEGOCIO.logo ? `background-image:url('${NEGOCIO.logo}')` : ""}">${NEGOCIO.logo ? "" : "Sin logo"}</div>
+          <span class="btn btn-sm filebtn">Subir logo<input type="file" id="pLogo" accept="image/*"></span>
+          ${NEGOCIO.logo ? `<button class="link" data-action="quitar" data-k="logo">Quitar</button>` : ""}</div>
+        <span class="hint">Si no subes logo, se muestran las iniciales del nombre.</span></div>
+      <div class="field"><span class="lbl">Foto de fondo</span>
+        <div class="upload"><div class="thumb" style="background-image:url('${NEGOCIO.fondo || PATRON}');${NEGOCIO.fondo ? "" : "background-size:90px"}"></div>
+          <span class="btn btn-sm filebtn">Subir foto del local<input type="file" id="pFondo" accept="image/*"></span>
+          ${NEGOCIO.fondo ? `<button class="link" data-action="quitar" data-k="fondo">Usar diseño de peluquería</button>` : ""}</div>
+        <span class="hint">Por defecto se usa un diseño de tijeras, peineta y secador. Puedes reemplazarlo por una foto del local.</span></div>
+      <div class="field"><label for="pOp">Transparencia del fondo</label>
+        <input type="range" id="pOp" min="0" max="0.6" step="0.02" value="${NEGOCIO.fondoOp}">
+        <span class="hint">Más a la izquierda, más suave.</span></div>
+      <button class="btn" data-action="ver-mi-link">Ver cómo lo ve la usuaria →</button>
+    </div></div>`;
+}
+
+function linkHTML(){
+  const url = `tucita.cl/${slugify(NEGOCIO.nombre)}`;
+  return `<div class="grid2">
+    <div class="card pane" style="padding:18px">
+      <h2>Tu link de reservas</h2>
+      <div class="bizlink">${esc(url)}</div>
+      <p class="muted" style="margin:0">Compártelo en tu Instagram, en tu estado de WhatsApp o imprímelo como código QR en el local. Cada clienta que reserve queda guardada automáticamente en tu lista de clientas.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" data-action="copiar" data-url="https://${esc(url)}">${UI.copiado ? "¡Copiado!" : "Copiar link"}</button>
+        <button class="btn" data-action="ver-mi-link">Ver como usuaria</button>
+      </div>
+      <p class="muted" style="margin:0;font-size:13px">La dirección es de ejemplo; se activa cuando publiques la app. El link cambia si cambias el nombre del negocio.</p>
+    </div>
+    <div class="card pane" style="padding:18px;align-items:center;text-align:center">
+      <div class="qr">Aquí irá el código QR del link</div>
+      <p class="muted" style="margin:0;font-size:13px">Para pegar en el espejo o en la caja.</p>
+    </div></div>`;
+}
+
+/* ---------- Vista Superadmin ---------- */
+function renderSuper(){
+  const root = document.getElementById("vistaSuper");
+  aplicarMarca(null);
+  if (!UI.sesion || UI.sesion.tipo !== "super"){
+    root.innerHTML = (UI.sesion && UI.sesion.tipo === "admin")
+      ? `<div class="login"><h2 style="font-size:20px">Esta sección es solo para TUCITA</h2>
+          <p>Estás conectada como admin de ${esc(negocio(UI.sesion.negocioId).cfg.nombre)}. Cierra sesión y entra con la cuenta de Superadmin.</p>
+          <button class="btn btn-primary" data-action="logout">Cerrar sesión</button></div>`
+      : loginHTML();
+    return;
+  }
+  const estados = NEGOCIOS.map(n => [n, estadoPlan(n)]);
+  const pagando = estados.filter(([,e]) => ["activo","por_vencer","gracia"].includes(e));
+  const enPrueba = estados.filter(([,e]) => e === "prueba").length;
+  const atencion = estados.filter(([,e]) => ["por_vencer","gracia","vencido"].includes(e)).length;
+  const mrr = pagando.reduce((t,[n]) => t + PLANES[n.plan.plan].precio, 0);
+
+  const avisos = AVISOS.length ? `<div class="card" style="margin-bottom:16px"><h2 style="font-size:18px;margin-bottom:4px">Avisos de pago por revisar</h2>
+    ${AVISOS.map(a => { const n = negocio(a.negocioId); return `<div class="aviso"><span><b>${esc(n.cfg.nombre)}</b> avisó que pagó
+      ${PLANES[n.plan.plan].nombre} (${clp.format(PLANES[n.plan.plan].precio)}) · ${a.hora}</span>
+      <span style="display:flex;gap:6px"><button class="btn btn-sm btn-primary" data-action="pago" data-id="${n.id}">Confirmar y registrar pago</button>
+      <button class="btn btn-sm" data-action="descartar" data-id="${n.id}">Descartar</button></span></div>`; }).join("")}</div>` : "";
+
+  const filas = estados.map(([n,e]) => {
+    const d = diasHasta(n.plan.pagadoHasta), cuenta = cuentaDe(n.id);
+    const proximas = n.data.citas.filter(c => c.fecha >= hoyISO() && c.estado !== "cancelada").length;
+    return `<tr>
+      <td><div class="negcell">${logoDe(n.cfg, "sm")}<div><b>${esc(n.cfg.nombre)}</b><span>${esc(n.cfg.rubro)} · ${esc(cuenta ? cuenta.email : "sin admin")}</span></div></div></td>
+      <td>${PLANES[n.plan.plan].nombre}<span class="sub num">${clp.format(PLANES[n.plan.plan].precio)}/mes</span></td>
+      <td>${pillEstado(e)}</td>
+      <td class="num">${fechaMedia(n.plan.pagadoHasta)}<span class="sub">${d >= 0 ? `en ${plural(d, "día", "días")}` : `hace ${plural(-d, "día", "días")}`}</span></td>
+      <td class="num">${proximas}</td>
+      <td><div class="acts">
+        <button class="btn btn-sm btn-primary" data-action="pago" data-id="${n.id}">Registrar pago</button>
+        <button class="btn btn-sm" data-action="suspender" data-id="${n.id}">${n.plan.suspendido ? "Reactivar" : "Suspender"}</button>
+        <button class="btn btn-sm" data-action="soporte" data-id="${n.id}">Entrar como admin</button>
+        <button class="btn btn-sm" data-action="ver-link" data-id="${n.id}">Ver link</button>
+      </div></td></tr>`;
+  }).join("");
+
+  const inv = UI.invitacion;
+  const lado = inv ? `<div class="card pane" style="padding:18px">
+      <h2>Así le llega la invitación</h2>
+      <div class="mail"><div class="mhead"><span><b>De:</b> TUCITA &lt;hola@tucita.cl&gt;</span><span><b>Para:</b> ${esc(inv.email)}</span>
+        <span><b>Asunto:</b> Te damos la bienvenida a TUCITA</span></div>
+        <div class="mbody">Hola 👋
+
+Creamos la cuenta de ${esc(inv.nombre)} en TUCITA. Tienes ${PRUEBA} días de prueba gratis.
+
+Entra a tucita.cl/entrar con tu correo y esta contraseña temporal: <b>${esc(inv.pass)}</b>
+Al entrar te pediremos cambiarla.
+
+Cualquier duda, responde este correo.</div></div>
+      <p class="muted" style="margin:0;font-size:12.5px">En la versión real llega un link para que ella cree su propia contraseña. Aquí usamos una temporal para que puedas probar.</p>
+      <button class="btn btn-primary" data-action="probar-cuenta" data-email="${esc(inv.email)}" data-pass="${esc(inv.pass)}">Probar entrar con esta cuenta</button>
+      <button class="link" data-action="cerrar-inv">Volver a las reglas de cobro</button>
+    </div>`
+    : `<div class="card pane" style="padding:18px">
+      <h2>Reglas de cobro</h2>
+      <ol class="rules">
+        <li>Cada negocio nuevo parte con <b>${PRUEBA} días de prueba gratis</b>.</li>
+        <li><b>${AVISO_PREVIO} días antes</b> de vencer, la admin ve un aviso para renovar.</li>
+        <li>Si vence, tiene <b>${GRACIA} días de gracia</b> con un aviso en rojo.</li>
+        <li>Pasada la gracia, su link de reservas se pausa y su panel muestra cómo pagar. <b>No se borra nada.</b></li>
+        <li>Al registrar el pago, el plan se extiende un mes y todo vuelve a funcionar.</li>
+      </ol>
+      <p class="muted" style="margin:0;font-size:13px">Precios de ejemplo: Básico ${clp.format(PLANES.basico.precio)} y Pro ${clp.format(PLANES.pro.precio)} al mes. Los defines tú.</p>
+    </div>`;
+
+  root.innerHTML = `
+    <div class="panel-head"><div class="logo">TC</div><div class="grow"><h1>Panel Superadmin</h1><p>Todos los negocios que usan TUCITA · solo tú ves esta pantalla</p></div>
+      <div class="head-actions"><button class="btn btn-sm" data-action="logout">Cerrar sesión</button></div></div>
+    <div class="tiles">
+      <div class="tile"><small>Negocios pagando</small><b class="num">${pagando.length}</b></div>
+      <div class="tile"><small>En prueba gratis</small><b class="num">${enPrueba}</b></div>
+      <div class="tile ${atencion ? "alert" : ""}"><small>Requieren atención</small><b class="num">${atencion}</b></div>
+      <div class="tile"><small>Ingreso mensual (planes al día)</small><b class="num">${clp.format(mrr)}</b></div>
+    </div>
+    ${avisos}
+    <div class="tablewrap" style="margin-bottom:18px"><table>
+      <thead><tr><th>Negocio y admin</th><th>Plan</th><th>Estado</th><th>Pagado hasta</th><th>Citas</th><th>Acciones</th></tr></thead>
+      <tbody>${filas}</tbody></table></div>
+    <div class="grid2">
+      <form class="card pane" id="formNegocio" style="padding:18px" novalidate>
+        <h2>Crear negocio e invitar a su admin</h2>
+        <div class="field"><label for="nNombre">Nombre del negocio</label><input id="nNombre" placeholder="Ej: Peluquería Estilo"></div>
+        <div class="field"><label for="nRubro">Rubro</label><input id="nRubro" placeholder="Peluquería, manicure, barbería…"></div>
+        <div class="field"><label for="nEmail">Correo de la admin</label><input id="nEmail" type="email" placeholder="duena@negocio.cl"></div>
+        <div class="field"><label for="nPlan">Plan</label><select id="nPlan">
+          ${Object.entries(PLANES).map(([k,p]) => `<option value="${k}">${p.nombre} · ${clp.format(p.precio)}/mes</option>`).join("")}</select></div>
+        ${UI.saError ? `<div class="err" role="alert">${esc(UI.saError)}</div>` : ""}
+        <button class="btn btn-primary" type="button" data-action="enviar">Crear y enviar invitación</button>
+      </form>
+      ${lado}
+    </div>`;
+}
+
+function registrarPago(id){
+  const n = negocio(id), base = diasHasta(n.plan.pagadoHasta) >= 0 ? n.plan.pagadoHasta : hoyISO();
+  n.plan.pagadoHasta = sumarMes(base);
+  n.plan.prueba = false; n.plan.suspendido = false;
+  n.pagos.push({ fecha:hoyISO(), monto:PLANES[n.plan.plan].precio });
+  const i = AVISOS.findIndex(a => a.negocioId === id); if (i >= 0) AVISOS.splice(i, 1);
+  toast(`<b>Pago registrado · ${esc(n.cfg.nombre)}</b><br>Plan pagado hasta el ${fechaMedia(n.plan.pagadoHasta)}.`);
+}
+
+/* ---------- Navegación ---------- */
+const VISTAS = { usuaria:["vistaUsuaria","btnUsuaria",renderUsuaria], admin:["vistaAdmin","btnAdmin",renderAdmin], super:["vistaSuper","btnSuper",renderSuper] };
+function setVista(v){
+  UI.vista = v; UI.campana = false;
+  for (const [k,[sec,btn]] of Object.entries(VISTAS)){
+    document.getElementById(sec).hidden = k !== v;
+    document.getElementById(btn).setAttribute("aria-pressed", k === v);
+  }
+  try { if (location.hash !== "#" + v) location.hash = v; } catch (_) { /* algunos visores no permiten cambiar la dirección */ }
+  VISTAS[v][2]();
+  window.scrollTo(0, 0);
+}
+function render(){ VISTAS[UI.vista][2](); }
+
+document.addEventListener("click", e => {
+  if (UI.campana && !e.target.closest(".head-actions")) { UI.campana = false; if (UI.vista === "admin") renderAdmin(); }
+  const el = e.target.closest("[data-action]"); if (!el) return;
+  const R = UI.reserva, a = el.dataset.action, id = el.dataset.id;
+  switch (a){
+    case "enviar": { const f = el.closest("form"); if (f) enviar(f.id); return; }
+    case "view": return setVista(el.dataset.view);
+    /* usuaria */
+    case "pick-svc": R.servicioId = id; R.paso = 2; return renderUsuaria();
+    case "pick-day": R.fecha = el.dataset.f; R.paso = 3; return renderUsuaria();
+    case "pick-hora": R.hora = el.dataset.h; R.paso = 4; R.error = ""; return renderUsuaria();
+    case "back": R.paso = Math.max(1, R.paso - 1); R.error = ""; return renderUsuaria();
+    case "nueva": resetReserva(); return renderUsuaria();
+    case "ver-en-panel": {
+      const c = S.citas.find(x => x.id === R.ultima);
+      if (UI.sesion && UI.sesion.tipo === "admin" && UI.sesion.negocioId === UI.publico){
+        UI.tab = "agenda"; UI.modo = "dia"; UI.diaPanel = c.fecha; UI.resaltar = c.id; return setVista("admin");
+      }
+      const cu = cuentaDe(UI.publico);
+      UI.sesion = null;
+      UI.login = { email:cu ? cu.email : "", pass:"", error:"", info:`Entra como admin de ${NEGOCIO.nombre} para ver la reserva (contraseña demo1234).` };
+      return setVista("admin");
+    }
+    /* login */
+    case "demo": UI.login = { email:el.dataset.email, pass:"demo1234", error:"", info:"" }; return render();
+    case "olvide": UI.login.info = "Si el correo está registrado, te llega un link para crear una contraseña nueva. (En el prototipo no se envía nada.)"; UI.login.error = ""; return render();
+    case "google": UI.login.info = "En la versión real se abre la ventana de Google para elegir tu cuenta. En el prototipo usa las cuentas de prueba."; UI.login.error = ""; return render();
+    case "logout": UI.sesion = null; UI.login = { email:"", pass:"", error:"", info:"" }; UI.resaltar = null; return render();
+    case "probar-cuenta": UI.sesion = null; UI.invitacion = null; UI.login = { email:el.dataset.email, pass:el.dataset.pass, error:"", info:"Contraseña temporal cargada. Toca Entrar." }; return setVista("admin");
+    /* admin */
+    case "tab": UI.tab = el.dataset.tab; UI.copiado = false; UI.guardado = false; return renderAdmin();
+    case "modo": UI.modo = el.dataset.m; return renderAdmin();
+    case "ir-dia": UI.diaPanel = el.dataset.f; UI.modo = "dia"; UI.resaltar = id || null; return renderAdmin();
+    case "dia": UI.diaPanel = el.dataset.f; return renderAdmin();
+    case "estado": S.citas.find(x => x.id === id).estado = el.dataset.e; return renderAdmin();
+    case "wa": S.citas.find(x => x.id === id).recordado = true; setTimeout(renderAdmin, 50); return;
+    case "color": NEGOCIO.color = el.dataset.c; aplicarMarca(NEGOCIO); return renderAdmin();
+    case "quitar": NEGOCIO[el.dataset.k] = null; aplicarMarca(NEGOCIO); return renderAdmin();
+    case "campana": UI.campana = !UI.campana; return renderAdmin();
+    case "ver-nueva": { const c = S.citas.find(x => x.id === id); c.nueva = false; UI.campana = false;
+      UI.tab = "agenda"; UI.modo = "dia"; UI.diaPanel = c.fecha; UI.resaltar = c.id; return renderAdmin(); }
+    case "vistas": S.citas.forEach(c => c.nueva = false); UI.campana = false; return renderAdmin();
+    case "ver-mi-link": UI.publico = ACTUAL.id; resetReserva(); return setVista("usuaria");
+    case "avisar-pago":
+      if (!AVISOS.some(x => x.negocioId === ACTUAL.id))
+        AVISOS.push({ negocioId:ACTUAL.id, hora:new Date().toLocaleString("es-CL",{ day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" }) });
+      return renderAdmin();
+    case "volver-super": UI.sesion = { tipo:"super" }; return setVista("super");
+    case "copiar":
+      try { navigator.clipboard.writeText(el.dataset.url).then(() => { UI.copiado = true; renderAdmin(); }).catch(() => {}); } catch(_) {}
+      return;
+    /* superadmin */
+    case "pago": registrarPago(id); return renderSuper();
+    case "descartar": { const i = AVISOS.findIndex(x => x.negocioId === id); if (i >= 0) AVISOS.splice(i, 1); return renderSuper(); }
+    case "suspender": { const n = negocio(id); n.plan.suspendido = !n.plan.suspendido; return renderSuper(); }
+    case "soporte": UI.sesion = { tipo:"admin", negocioId:id, soporte:true }; UI.tab = "agenda"; UI.diaPanel = null; return setVista("admin");
+    case "ver-link": UI.publico = id; resetReserva(); return setVista("usuaria");
+    case "cerrar-inv": UI.invitacion = null; return renderSuper();
+  }
+});
+document.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches(".whead[data-action]")) { e.preventDefault(); e.target.click(); }
+  if (e.key === "Escape" && UI.campana) { UI.campana = false; renderAdmin(); }
+});
+
+document.addEventListener("input", e => {
+  const R = UI.reserva, id = e.target.id;
+  if (id === "inNombre") R.nombre = e.target.value;
+  if (id === "inTel" || id === "pTel") { e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9); if (id === "inTel") R.tel = e.target.value; }
+  if (id === "inEmail") R.email = e.target.value;
+  if (id === "lgEmail") UI.login.email = e.target.value;
+  if (id === "lgPass") UI.login.pass = e.target.value;
+  if (id === "inBuscar") { UI.buscar = e.target.value; document.getElementById("tablaClientas").innerHTML = tablaClientas(); actualizarConteo(); }
+  if (id === "pColor") { NEGOCIO.color = e.target.value; aplicarMarca(NEGOCIO); document.querySelectorAll(".sw").forEach(b => b.setAttribute("aria-pressed", "false")); }
+  if (id === "pOp") { NEGOCIO.fondoOp = parseFloat(e.target.value); aplicarMarca(NEGOCIO); }
+});
+document.addEventListener("change", e => {
+  const id = e.target.id;
+  if (id === "inWa") UI.reserva.wa = e.target.checked;
+  if (id === "selNeg") { UI.publico = e.target.value; resetReserva(); return renderUsuaria(); }
+  if (id === "pLogo" || id === "pFondo"){
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    const cfg = NEGOCIO, reader = new FileReader();
+    reader.onload = () => { cfg[id === "pLogo" ? "logo" : "fondo"] = reader.result; aplicarMarca(cfg); renderAdmin(); };
+    reader.readAsDataURL(file);
+  }
+});
+
+/* El visor de Claude bloquea el envío normal de formularios, así que los botones llaman a enviar() directamente */
+document.addEventListener("submit", e => { e.preventDefault(); enviar(e.target.id); });
+document.addEventListener("keydown", e => {
+  if (e.key !== "Enter" || !e.target.matches("form input")) return;
+  if (e.target.type === "checkbox" || e.target.type === "file") return;
+  e.preventDefault(); enviar(e.target.closest("form").id);
+});
+function enviar(fid){
+  if (fid === "formLogin") return entrar();
+  if (fid === "formReserva") return confirmarReserva();
+  if (fid === "formServicio"){
+    const nombre = document.getElementById("svNombre").value.trim();
+    const cat = document.getElementById("svCat").value.trim() || "Otros";
+    const dur = parseInt(document.getElementById("svDur").value, 10);
+    const precio = parseInt(document.getElementById("svPrecio").value, 10);
+    const err = document.getElementById("svErr");
+    if (!nombre || !(dur >= 15) || !(precio >= 0)) { err.innerHTML = `<div class="err">Completa nombre, duración (mínimo 15 min) y precio.</div>`; return; }
+    S.servicios.push({ id:"s" + (++S.seq), nombre, cat, dur, precio });
+    return renderAdmin();
+  }
+  if (fid === "formMarca"){
+    const v = id => document.getElementById(id).value.trim();
+    const abre = v("pAbre"), cierra = v("pCierra");
+    const dias = [...document.querySelectorAll(".pDia:checked")].map(x => Number(x.value));
+    const err = document.getElementById("pErr");
+    if (!v("pNombre")) { err.innerHTML = `<div class="err">El nombre del negocio no puede quedar vacío.</div>`; return; }
+    if (toMin(cierra) - toMin(abre) < 60) { err.innerHTML = `<div class="err">La hora de cierre debe ser al menos una hora después de la apertura.</div>`; return; }
+    if (!dias.length) { err.innerHTML = `<div class="err">Marca al menos un día de atención.</div>`; return; }
+    Object.assign(NEGOCIO, { nombre:v("pNombre"), rubro:v("pRubro"), direccion:v("pDir"), telNegocio:v("pTel"), correoNegocio:v("pMail"), apertura:abre, cierre:cierra, dias });
+    UI.diaPanel = null; UI.guardado = true; renderAdmin();
+    setTimeout(() => { UI.guardado = false; const b = document.querySelector("#formMarca .btn-primary"); if (b) b.textContent = "Guardar datos"; }, 1800);
+  }
+  if (fid === "formNegocio"){
+    const nombre = document.getElementById("nNombre").value.trim();
+    const rubro = document.getElementById("nRubro").value.trim() || "Peluquería";
+    const email = document.getElementById("nEmail").value.trim().toLowerCase();
+    const planKey = document.getElementById("nPlan").value;
+    if (!nombre) { UI.saError = "Escribe el nombre del negocio."; return renderSuper(); }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { UI.saError = "Revisa el correo de la admin, parece incompleto."; return renderSuper(); }
+    if (CUENTAS.some(c => c.email === email)) { UI.saError = "Ese correo ya tiene una cuenta en TUCITA."; return renderSuper(); }
+    UI.saError = "";
+    const id = "n" + Date.now().toString(36);
+    const cfg = cfgBase({ nombre, rubro, correoNegocio:email });
+    NEGOCIOS.push(nuevoNegocio(id, cfg, planKey, masDias(PRUEBA), { prueba:true }, [
+      { nombre:"Corte de pelo", cat:"Peluquería", dur:45, precio:15000 },
+      { nombre:"Manicure", cat:"Uñas", dur:60, precio:12000 }
+    ], [], [], []));
+    const pass = "tucita" + Math.floor(1000 + Math.random() * 9000);
+    CUENTAS.push({ email, pass, tipo:"admin", negocioId:id });
+    UI.invitacion = { email, pass, nombre };
+    toast(`<b>Negocio creado · ${esc(nombre)}</b><br>Invitación enviada a ${esc(email)} (simulado).`);
+    return renderSuper();
+  }
+}
+
+window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (VISTAS[v] && v !== UI.vista) setVista(v); });
+setVista(VISTAS[location.hash.slice(1)] ? location.hash.slice(1) : "usuaria");
+</script>
+</body>
+</html>
