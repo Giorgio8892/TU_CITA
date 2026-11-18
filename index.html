@@ -304,6 +304,30 @@ a.sub{color:var(--accent);text-decoration:none}
 .qrbox{background:#fff;border-radius:12px;padding:8px;line-height:0}
 .qrbox svg{width:200px;height:200px}
 .btn[disabled]{opacity:.6;cursor:wait}
+
+.links{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.infolocal{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;background:var(--surface-2);font-size:14px;align-self:stretch;text-align:left}
+.mhbar{display:flex;justify-content:flex-end;padding:10px 20px 0}
+.abonobox{align-self:stretch;display:flex;flex-direction:column;gap:8px;border:1px solid color-mix(in srgb, var(--warn) 35%, transparent);background:var(--warn-soft);color:var(--ink);border-radius:var(--r);padding:12px 14px;font-size:14px;text-align:left}
+.abonobox > b{color:var(--warn)}
+.abonoline{font-size:13px;color:var(--warn);font-weight:500}
+.comentario{font-size:13.5px;color:var(--ink);background:var(--surface-2);border-radius:8px;padding:4px 8px;margin-top:4px;display:inline-block}
+.cita.pendiente_abono{border-left-color:var(--accent);border-left-style:dashed}
+.wblock.pendiente_abono{border-left-color:var(--accent);border-style:dashed}
+.micita{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+.micita.cancelada{opacity:.7}
+.mihead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.mihead .cap{font-size:13.5px;color:var(--muted)}
+.picker{display:flex;flex-direction:column;gap:8px;border-top:1px dashed var(--line);padding-top:10px}
+.day[aria-pressed="true"],.slot[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.btn-danger{background:var(--bad);border-color:var(--bad);color:#fff;font-weight:700}
+@media (max-width:600px){
+  .dropdown{position:fixed;left:12px;right:12px;top:64px;width:auto;max-height:70vh;overflow:auto;z-index:70}
+  .toast{left:12px;right:12px;width:auto;top:auto;bottom:16px}
+  .topmail{display:none}
+  .panel-head h1{font-size:22px}
+  .head-actions{width:100%;justify-content:flex-end}
+}
 </style>
 </head>
 <body>
@@ -412,9 +436,21 @@ const ST = {
   neg: null, ajustes: null, planes: [], estado: null, soporte: false,
   citas: [], clientas: [], servicios: [], pagos: [], avisoPendiente: false,
   tab: "agenda", modo: "semana", diaPanel: null, buscar: "", resaltar: null, campana: false, guardado: "",
-  sup: { negocios:[], perfiles:[], invitaciones:[], avisos:[], proximas:{}, nuevo:null, error:"", confirmar:null, ajustesOk:false }
+  sup: { negocios:[], perfiles:[], invitaciones:[], avisos:[], proximas:{}, nuevo:null, error:"", confirmar:null, ajustesOk:false, movs:[], filtro:"" },
+  mis: { abierto:false, citas:null, cambio:null, anular:null, borradores:{} },
+  movs: null
 };
+const ESTADO_TXT = { pendiente_abono:"Esperando abono", agendada:"Por confirmar", confirmada:"Confirmada", cancelada:"Anulada", no_asistio:"No asistió" };
+const ESTADO_PILL = { pendiente_abono:"agendada", agendada:"agendada", confirmada:"confirmada", cancelada:"cancelada", no_asistio:"cancelada" };
+const LS_KEY = "tucita_mis_horas";
+function leerTokens(){ try { return (JSON.parse(localStorage.getItem(LS_KEY) || "[]") || []).filter(x => x && x.t && x.s); } catch (_) { return []; } }
+function guardarToken(t, s){ try { const l = leerTokens().filter(x => x.t !== t); l.push({ t, s }); localStorage.setItem(LS_KEY, JSON.stringify(l.slice(-50))); } catch (_) {} }
+const urlMaps = d => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d)}`;
+const urlWaze = d => `https://waze.com/ul?q=${encodeURIComponent(d)}&navigate=yes`;
+const fechaHora = ts => { if (!ts) return ""; const p = partes(ts); return `${p.fecha.split("-").reverse().join("-")} ${p.hora}`; };
+const vencimiento = ts => { const p = partes(ts); return p.fecha === hoyISO() ? `hoy a las ${p.hora}` : `el ${fechaCorta(p.fecha)} a las ${p.hora}`; };
 let canal = null, refresco = null;
+const avisados = new Set();
 let RECUPERANDO = /type=recovery/.test(location.hash);
 
 /* ---------- Ruta: /<slug> = link de reservas; / = panel ---------- */
@@ -446,13 +482,39 @@ async function iniciarReserva(){
   try {
     const data = await q(sb.rpc("negocio_publico", { p_slug: ST.slug }));
     if (!data) ST.pubError = "No encontramos este local. Revisa que el link esté bien escrito.";
-    else { ST.pub = data; aplicarMarca(data); document.title = `${data.nombre} · Reserva tu hora`; }
+    else {
+      ST.pub = data; aplicarMarca(data); document.title = `${data.nombre} · Reserva tu hora`;
+      const params = new URLSearchParams(location.search), r = params.get("r");
+      if (r && /^[0-9a-f-]{36}$/i.test(r)) {
+        guardarToken(r.toLowerCase(), ST.slug); params.delete("r");
+        try { history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "")); } catch (_) {}
+        ST.mis.abierto = true; render(); return cargarMisHoras();
+      }
+    }
   } catch (e) { ST.pubError = msgErr(e); }
   render();
 }
 const bizHeaderPub = () => `<div class="biz">${logoDe(ST.pub)}<div><h1>${esc(ST.pub.nombre)}</h1>
   <p>${esc(ST.pub.rubro)}${ST.pub.direccion ? " · " + esc(ST.pub.direccion) : ""}</p></div></div>`;
 
+function infoLocalHTML(P){
+  const dir = (P.direccion || "").trim(), tel = (P.tel_negocio || "").replace(/\D/g, "");
+  let ig = (P.instagram || "").trim();
+  const igUrl = !ig ? "" : /instagram\.com/i.test(ig) ? (ig.startsWith("http") ? ig : "https://" + ig) : `https://instagram.com/${ig.replace(/^@/, "")}`;
+  const nd = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+  const dias = [1,2,3,4,5,6,0].filter(d => (P.dias || []).includes(d)).map(d => nd[d]).join(", ");
+  return `<div class="infolocal">
+    ${dir ? `<div><b>📍 ${esc(dir)}</b></div><div class="links"><a class="btn btn-sm" href="${urlMaps(dir)}" target="_blank" rel="noopener">Cómo llegar · Google Maps</a>
+      <a class="btn btn-sm" href="${urlWaze(dir)}" target="_blank" rel="noopener">Waze</a></div>` : ""}
+    <div class="muted">🕐 ${esc(dias)} · ${esc(P.apertura || hhmm(P.apertura))}–${esc(P.cierre || "")}</div>
+    ${tel.length === 9 || igUrl ? `<div class="links">${tel.length === 9 ? `<a class="btn btn-sm btn-wa" href="https://wa.me/56${tel}" target="_blank" rel="noopener">WhatsApp del local</a>` : ""}
+      ${igUrl ? `<a class="btn btn-sm" href="${esc(igUrl)}" target="_blank" rel="noopener">Instagram</a>` : ""}</div>` : ""}
+  </div>`;
+}
+function barraMisHoras(){
+  const n = leerTokens().filter(x => x.s === ST.slug).length;
+  return n ? `<div class="mhbar"><button class="btn btn-sm" data-action="mis-abrir">📅 Mis horas (${n})</button></div>` : "";
+}
 function reservaHTML(){
   if (ST.pubError) return `<div class="phone"><div class="pane"><h2>Ups</h2><p class="muted" style="margin:0">${esc(ST.pubError)}</p></div></div>`;
   if (!ST.pub) return cargandoHTML();
@@ -464,6 +526,7 @@ function reservaHTML(){
       ${tel.length === 9 ? `<a class="btn btn-wa" href="https://wa.me/56${tel}" target="_blank" rel="noopener">Escribir por WhatsApp</a>` : ""}
     </div></div>`;
   }
+  if (ST.mis.abierto) return misHorasHTML();
   if (R.paso === 5) return exitoHTML();
   const servicios = P.servicios || [];
   const sv = servicios.find(s => s.id === R.servicioId);
@@ -476,6 +539,7 @@ function reservaHTML(){
       ${servicios.filter(s => s.categoria === cat).map(s => `<button class="svc" data-action="pick-svc" data-id="${s.id}">
         <div><strong>${esc(s.nombre)}</strong><span>${s.duracion_min} min</span></div><div class="price num">${clp.format(s.precio)}</div></button>`).join("")}`).join("")
       : `<div class="empty">Este local aún no publica sus servicios.</div>`;
+    body += infoLocalHTML(P);
   }
   if (R.paso === 2){
     const dias = proximosDiasDe(P.dias || [], 12);
@@ -501,27 +565,108 @@ function reservaHTML(){
         <div class="field"><label for="inTel">Celular</label><div class="phonein"><span>+56</span><input id="inTel" inputmode="numeric" autocomplete="tel-national" maxlength="9" value="${esc(R.tel)}" placeholder="912345678"></div></div>
         <div class="field"><label for="inEmail">Correo (opcional)</label><input id="inEmail" type="email" autocomplete="email" value="${esc(R.email)}" placeholder="tu@correo.cl"></div>
         <label class="check" for="inWa"><input type="checkbox" id="inWa" ${R.wa ? "checked" : ""}><span>Acepto recibir recordatorios de mi hora por WhatsApp.</span></label>
+        ${P.requiere_abono ? `<div class="banner warn" style="margin:0"><span>Para asegurar tu hora, este local pide un <b>abono de ${clp.format(P.abono_monto)}</b> por transferencia dentro de ${plural(P.abono_horas, "hora", "horas")} después de reservar. Si no llega a tiempo, la hora se anula y queda libre.</span></div>` : ""}
         ${R.error ? `<div class="err" role="alert">${esc(R.error)}</div>` : ""}
-        <button class="btn btn-primary" type="button" data-action="enviar">Confirmar reserva</button>
+        <button class="btn btn-primary" type="button" data-action="enviar">${P.requiere_abono ? "Reservar y ver datos para abonar" : "Confirmar reserva"}</button>
       </form>`;
   }
-  return `<div class="phone">${bizHeaderPub()}${prog}<div class="pane">${body}</div></div>
+  return `<div class="phone">${bizHeaderPub()}${R.paso === 1 ? barraMisHoras() : ""}${prog}<div class="pane">${body}</div></div>
     <p class="note">Reservas con TUCITA</p>`;
 }
 
+function abonoHTML(monto, expira, datos, txtWa){
+  const tel = (ST.pub.tel_negocio || "").replace(/\D/g, "");
+  return `<div class="abonobox"><b>Falta tu abono de ${clp.format(monto)}</b>
+    <span>Transfiérelo antes de ${vencimiento(expira)}. Si no llega a tiempo, la hora se anula sola y queda libre para otra persona.</span>
+    ${datos ? `<div class="info" style="white-space:pre-line">${esc(datos)}</div>` : ""}
+    ${tel.length === 9 ? `<a class="btn btn-wa btn-sm" href="https://wa.me/56${tel}?text=${encodeURIComponent(txtWa)}" target="_blank" rel="noopener">Enviar comprobante por WhatsApp</a>` : ""}</div>`;
+}
 function exitoHTML(){
   const P = ST.pub, r = ST.reserva.resultado, a = partes(r.inicio), b = partes(r.fin);
-  const tel = (P.tel_negocio || "").replace(/\D/g, "");
-  const txt = `Hola, acabo de reservar ${r.servicio} para el ${fechaLarga(a.fecha)} a las ${a.hora}. Mi nombre es ${ST.reserva.nombre.trim()}.`;
+  const tel = (P.tel_negocio || "").replace(/\D/g, ""), nombre = ST.reserva.nombre.trim();
+  const pendiente = r.estado === "pendiente_abono";
+  const link = `${linkReservas(ST.slug)}?r=${r.token}`;
+  const txt = `Hola, acabo de reservar ${r.servicio} para el ${fechaLarga(a.fecha)} a las ${a.hora}. Mi nombre es ${nombre}.`;
+  const txtAbono = `Hola, envío el comprobante del abono de ${clp.format(r.abono_monto)} por mi hora de ${r.servicio} el ${fechaLarga(a.fecha)} a las ${a.hora}. Mi nombre es ${nombre}.`;
+  const miTel = ST.reserva.tel.replace(/\D/g, "");
   return `<div class="phone">${bizHeaderPub()}<div class="success">
-    <div class="tick">✓</div>
-    <h2>¡Listo, ${esc(ST.reserva.nombre.trim().split(" ")[0])}! Tu hora quedó reservada</h2>
+    <div class="tick">${pendiente ? "⏳" : "✓"}</div>
+    <h2>${pendiente ? `¡Casi listo, ${esc(nombre.split(" ")[0])}! Tu hora está apartada` : `¡Listo, ${esc(nombre.split(" ")[0])}! Tu hora quedó reservada`}</h2>
     <div class="summary"><b>${esc(r.servicio)}</b><span class="cap">${fechaLarga(a.fecha)} · ${a.hora} a ${b.hora}</span>
-      <span class="num">${clp.format(r.precio)} · se paga en el local</span>${r.direccion ? `<span>${esc(r.direccion)}</span>` : ""}</div>
-    <p class="muted" style="margin:0;text-align:center">Si necesitas cambiar o cancelar, avísale al local.</p>
-    ${tel.length === 9 ? `<a class="btn btn-wa" href="https://wa.me/56${tel}?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener">Avisar al local por WhatsApp</a>` : ""}
+      <span class="num">${clp.format(r.precio)}${pendiente ? ` · el abono se descuenta del total` : " · se paga en el local"}</span></div>
+    ${pendiente ? abonoHTML(r.abono_monto, r.expira_en, r.abono_datos, txtAbono) : ""}
+    <div class="summary" style="text-align:left"><b>📅 Guardamos tu hora en este teléfono</b>
+      <span>Desde «Mis horas» puedes verla, cambiar el día u hora, anularla o dejarle un comentario al local (por ejemplo: «llegaré 10 minutos tarde»).</span>
+      <div class="links" style="margin-top:6px"><button class="btn btn-sm btn-primary" data-action="mis-abrir">Ver mis horas</button>
+        ${miTel.length === 9 ? `<a class="btn btn-sm btn-wa" href="https://wa.me/56${miTel}?text=${encodeURIComponent(`Mi hora en ${P.nombre}: ${link}`)}" target="_blank" rel="noopener">Enviarme el link por WhatsApp</a>` : ""}
+        <button class="btn btn-sm" data-action="copiar" data-txt="${esc(link)}">Copiar mi link</button></div>
+      <span class="hint">Con ese link puedes entrar a tu reserva desde cualquier teléfono.</span></div>
+    ${infoLocalHTML(P)}
+    ${!pendiente && tel.length === 9 ? `<a class="btn btn-wa" href="https://wa.me/56${tel}?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener">Avisar al local por WhatsApp</a>` : ""}
     <button class="link" data-action="nueva">Hacer otra reserva</button>
   </div></div>`;
+}
+
+/* ---------- Mis horas (clienta) ---------- */
+async function cargarMisHoras(){
+  const tokens = leerTokens().map(x => x.t);
+  ST.mis.citas = null; render();
+  if (!tokens.length) { ST.mis.citas = []; return render(); }
+  try { const data = await q(sb.rpc("mis_citas", { p_tokens: tokens })); ST.mis.citas = (data || []).filter(c => c.negocio.slug === ST.slug); }
+  catch (e) { ST.mis.citas = []; toast(`<b>No pudimos cargar tus horas</b><br>${esc(msgErr(e))}`); }
+  render();
+}
+function miCitaHTML(c){
+  const a = partes(c.inicio), b = partes(c.fin), N = c.negocio, tel = (N.tel_negocio || "").replace(/\D/g, "");
+  const activa = !["cancelada","no_asistio"].includes(c.estado) && new Date(c.fin) > Date.now();
+  const puedeCambiar = activa && (c.estado === "pendiente_abono" || new Date(c.inicio) - Date.now() > N.horas_cambio * 3600000);
+  const ch = ST.mis.cambio && ST.mis.cambio.token === c.token ? ST.mis.cambio : null;
+  const txtAbono = `Hola, envío el comprobante del abono de ${clp.format(c.abono_monto)} por mi hora de ${c.servicio} el ${fechaLarga(a.fecha)} a las ${a.hora}. Mi nombre es ${c.clienta}.`;
+  let picker = "";
+  if (ch){
+    const dias = proximosDiasDe(N.dias || [], 12);
+    picker = `<div class="picker"><b>Elige el nuevo día</b>
+      <div class="days">${dias.map(f => { const d = parseISO(f); return `<button class="day" aria-pressed="${ch.fecha === f}" data-action="mh-dia" data-t="${c.token}" data-f="${f}">
+        <small>${d.toLocaleDateString("es-CL",{weekday:"short"})}</small><b class="num">${d.getDate()}</b><small>${d.toLocaleDateString("es-CL",{month:"short"})}</small></button>`; }).join("")}</div>
+      ${ch.fecha ? (ch.horas === null ? `<div class="empty">Buscando horas libres…</div>` : ch.horas.length
+        ? `<b>Elige la nueva hora</b><div class="slots">${ch.horas.map(h => `<button class="slot num" aria-pressed="${ch.hora === h}" data-action="mh-hora" data-h="${h}">${h}</button>`).join("")}</div>`
+        : `<div class="empty">No quedan horas libres ese día. Prueba con otro.</div>`) : ""}
+      <div class="links">${ch.hora ? `<button class="btn btn-primary btn-sm" data-action="mh-ok" data-t="${c.token}">Cambiar a ${esc(fechaCorta(ch.fecha))} · ${ch.hora}</button>` : ""}
+        <button class="btn btn-sm" data-action="mh-cerrar">No cambiar</button></div></div>`;
+  }
+  return `<div class="micita ${c.estado}">
+    <div class="mihead"><div><b>${esc(c.servicio)}</b><div class="cap">${fechaLarga(a.fecha)} · ${a.hora} a ${b.hora}</div></div>
+      <span class="pill ${ESTADO_PILL[c.estado]}">${ESTADO_TXT[c.estado]}</span></div>
+    ${c.estado === "cancelada" ? `<p class="muted" style="margin:0">${c.cancelada_por === "sistema" ? "Se anuló porque el abono no llegó a tiempo." : c.cancelada_por === "clienta" ? "La anulaste tú." : "Esta hora fue anulada."}</p>` : ""}
+    ${activa && c.estado === "pendiente_abono" ? abonoHTML(c.abono_monto, c.expira_en, N.abono_datos, txtAbono) : ""}
+    ${activa && c.abono_pagado ? `<span class="pill sent">Abono recibido</span>` : ""}
+    ${activa ? `<div class="field"><label for="com-${c.token}">Comentario para el local</label>
+      <textarea id="com-${c.token}" class="comtxt" data-t="${c.token}" rows="2" maxlength="300" placeholder="Ej: Llegaré 10 minutos tarde">${esc(ST.mis.borradores[c.token] ?? c.comentario)}</textarea>
+      <div class="links"><button class="btn btn-sm" data-action="comentar" data-t="${c.token}">Enviar comentario</button></div></div>` : ""}
+    ${picker}
+    ${puedeCambiar && !ch ? `<div class="links">
+      <button class="btn btn-sm" data-action="mh-cambiar" data-t="${c.token}">Cambiar día u hora</button>
+      ${ST.mis.anular === c.token ? `<button class="btn btn-sm btn-danger" data-action="mh-anular-ok" data-t="${c.token}">Sí, anular mi hora</button><button class="btn btn-sm" data-action="mh-anular-no">No</button>`
+        : `<button class="btn btn-sm" data-action="mh-anular" data-t="${c.token}">Anular hora</button>`}</div>` : ""}
+    ${activa && !puedeCambiar ? `<p class="muted" style="margin:0;font-size:13px">Faltan menos de ${plural(N.horas_cambio, "hora", "horas")} para tu cita: para cambiarla o anularla, escríbele directamente al local.
+      ${tel.length === 9 ? `<a href="https://wa.me/56${tel}" target="_blank" rel="noopener">WhatsApp del local</a>` : ""}</p>` : ""}
+    ${activa && N.direccion ? `<div class="links"><a class="btn btn-sm" href="${urlMaps(N.direccion)}" target="_blank" rel="noopener">📍 Cómo llegar</a></div>` : ""}
+  </div>`;
+}
+function misHorasHTML(){
+  const C = ST.mis.citas;
+  let body;
+  if (C === null) body = `<div class="empty">Cargando tus horas…</div>`;
+  else if (!C.length) body = `<div class="empty">No hay horas guardadas en este teléfono para ${esc(ST.pub.nombre)}. Si reservaste desde otro teléfono, abre el link personal que te enviaste.</div>`;
+  else {
+    const prox = C.filter(c => new Date(c.fin) > Date.now() && c.estado !== "cancelada");
+    const otras = C.filter(c => !prox.includes(c)).reverse().slice(0, 5);
+    body = (prox.length ? prox.map(miCitaHTML).join("") : `<div class="empty">No tienes horas próximas.</div>`)
+      + (otras.length ? `<div class="cat">Anteriores y anuladas</div>${otras.map(miCitaHTML).join("")}` : "");
+  }
+  return `<div class="phone">${bizHeaderPub()}<div class="pane">
+    <button class="link back" data-action="mis-cerrar">← Reservar una hora</button>
+    <h2>Mis horas</h2>${body}</div></div><p class="note">Reservas con TUCITA</p>`;
 }
 
 async function cargarHoras(){
@@ -544,7 +689,7 @@ async function confirmarReserva(btn){
     try {
       R.resultado = await q(sb.rpc("reservar", { p_slug:ST.slug, p_servicio:R.servicioId, p_fecha:R.fecha, p_hora:R.hora,
         p_nombre:nombre, p_telefono:tel, p_email:email || null, p_whatsapp:R.wa }));
-      R.paso = 5; R.error = "";
+      R.paso = 5; R.error = ""; guardarToken(R.resultado.token, ST.slug);
     } catch (e) { R.error = msgErr(e); }
   });
   render();
@@ -674,8 +819,9 @@ async function cargarAdmin(id, soporte){
 async function cargarDatosNegocio(){
   const id = ST.neg.id;
   const desde = new Date(Date.now() - 86400000).toISOString(), hasta = new Date(Date.now() + 16 * 86400000).toISOString();
+  try { await sb.rpc("expirar_abonos"); } catch (_) {}
   const [citas, clientas, servicios, pagos, avisos] = await Promise.all([
-    q(sb.from("citas").select("id,inicio,fin,estado,recordado,vista,clienta_id,servicio_id").eq("negocio_id", id).gte("inicio", desde).lt("inicio", hasta).order("inicio")),
+    q(sb.from("citas").select("id,inicio,fin,estado,recordado,vista,clienta_id,servicio_id,comentario,comentario_en,abono_monto,abono_pagado,expira_en,cancelada_por,reprogramada_en").eq("negocio_id", id).gte("inicio", desde).lt("inicio", hasta).order("inicio")),
     q(sb.from("clientas").select("*").eq("negocio_id", id).order("nombre")),
     q(sb.from("servicios").select("*").eq("negocio_id", id).order("categoria").order("precio")),
     q(sb.from("pagos").select("*").eq("negocio_id", id).order("fecha", { ascending:false })),
@@ -695,13 +841,19 @@ function escucharCitas(){
   canal = sb.channel("citas-" + id)
     .on("postgres_changes", { event:"*", schema:"public", table:"citas", filter:`negocio_id=eq.${id}` }, async p => {
       await recargar();
-      if (p.eventType === "INSERT"){
-        const c = ST.citas.find(x => x.id === p.new.id);
-        if (c){
-          const txt = `${c.cl.nombre} · ${c.sv.nombre} · ${fechaCorta(c.fecha)}, ${c.hora}`;
-          toast(`<b>Nueva reserva</b><br>${esc(txt)}`);
-          try { if ("Notification" in window && Notification.permission === "granted") new Notification("Nueva reserva · TUCITA", { body: txt }); } catch (_) {}
-        }
+      const n = p.new || {}, reciente = t => t && Date.now() - Date.parse(t) < 90000;
+      let titulo = "";
+      if (p.eventType === "INSERT") titulo = "Nueva reserva";
+      else if (p.eventType === "UPDATE"){
+        if (n.estado === "cancelada" && n.cancelada_por === "clienta" && !avisados.has(n.id + "c")) { titulo = "Una clienta anuló su hora"; avisados.add(n.id + "c"); }
+        else if (reciente(n.reprogramada_en) && !avisados.has(n.id + n.reprogramada_en)) { titulo = "Una clienta cambió su hora"; avisados.add(n.id + n.reprogramada_en); }
+        else if (reciente(n.comentario_en) && !avisados.has(n.id + n.comentario_en)) { titulo = "Comentario nuevo"; avisados.add(n.id + n.comentario_en); }
+      }
+      const c = ST.citas.find(x => x.id === n.id);
+      if (titulo && c){
+        const txt = `${c.cl.nombre} · ${c.sv.nombre} · ${fechaCorta(c.fecha)}, ${c.hora}${titulo === "Comentario nuevo" && c.comentario ? ` · «${c.comentario}»` : ""}`;
+        toast(`<b>${titulo}</b><br>${esc(txt)}`);
+        try { if ("Notification" in window && Notification.permission === "granted") new Notification(`${titulo} · TUCITA`, { body: txt }); } catch (_) {}
       }
     }).subscribe();
   // Respaldo por si se corta la conexión en vivo
@@ -727,8 +879,8 @@ function adminHTML(){
   const soporte = ST.soporte ? `<div class="banner neutral"><span>Estás viendo <b>${esc(N.nombre)}</b> como Superadmin (modo soporte).</span>
     <button class="btn btn-sm" data-action="volver-super">Volver a Superadmin</button></div>` : "";
   if (bloqueado(est) && !ST.soporte) return bloqueadoHTML(est);
-  const tabs = [["agenda","Agenda"],["clientas","Clientas"],["servicios","Servicios"],["personalizar","Personalizar"],["link","Link de reservas"],["plan","Mi plan"]];
-  const bodies = { agenda:agendaHTML, clientas:clientasHTML, servicios:serviciosHTML, personalizar:personalizarHTML, link:linkHTML, plan:planHTML };
+  const tabs = [["agenda","Agenda"],["clientas","Clientas"],["servicios","Servicios"],["personalizar","Personalizar"],["link","Link de reservas"],["historial","Historial"],["plan","Mi plan"]];
+  const bodies = { agenda:agendaHTML, clientas:clientasHTML, servicios:serviciosHTML, personalizar:personalizarHTML, link:linkHTML, historial:historialHTML, plan:planHTML };
   return `<div class="adminbox">${soporte}
     <div class="panel-head">${logoDe(N)}<div class="grow"><h1>${esc(N.nombre)}</h1>
       <p>Horario ${hhmm(N.apertura)}–${hhmm(N.cierre)} · ${plural((N.dias || []).length, "día", "días")} de atención a la semana</p></div>
@@ -739,10 +891,10 @@ function adminHTML(){
 }
 
 function campanaHTML(){
-  const nuevas = ST.citas.filter(c => !c.vista && c.estado !== "cancelada");
+  const nuevas = ST.citas.filter(c => !c.vista && (c.estado !== "cancelada" || c.cancelada_por === "clienta"));
   const drop = ST.campana ? `<div class="dropdown" role="menu">
     ${nuevas.length ? nuevas.map(c => `<button class="ditem" data-action="ver-nueva" data-id="${c.id}">
-        <b>${esc(c.cl.nombre)}</b> reservó ${esc(c.sv.nombre)}<span class="cap">${fechaCorta(c.fecha)} · ${c.hora}</span></button>`).join("")
+        <b>${esc(c.cl.nombre)}</b> ${accionDe(c)} ${esc(c.sv.nombre)}<span class="cap">${fechaCorta(c.fecha)} · ${c.hora}${c.comentario ? ` · «${esc(c.comentario)}»` : ""}</span></button>`).join("")
       : `<div class="ditem muted" style="cursor:default">No tienes reservas nuevas. Cuando alguien reserve por tu link, aparece aquí.</div>`}
     ${nuevas.length ? `<div class="dfoot"><span class="muted">${plural(nuevas.length, "reserva nueva", "reservas nuevas")}</span>
       <button class="link" data-action="vistas">Marcar como vistas</button></div>` : ""}
@@ -750,6 +902,12 @@ function campanaHTML(){
   </div>` : "";
   return `<div class="bell"><button class="btn btn-sm" data-action="campana" aria-expanded="${ST.campana}">🔔 Nuevas</button>
     ${nuevas.length ? `<span class="badge num">${nuevas.length}</span>` : ""}</div>${drop}`;
+}
+function accionDe(c){
+  if (c.estado === "cancelada") return "anuló su hora de";
+  if (c.reprogramada_en && (!c.comentario_en || c.reprogramada_en > c.comentario_en)) return "cambió su hora de";
+  if (c.comentario_en) return "dejó un comentario en";
+  return "reservó";
 }
 function bannerPlan(est){
   const N = ST.neg, d = diasHasta(N.pagado_hasta);
@@ -837,26 +995,33 @@ function diaHTML(toggle){
   const activas = delDia.filter(c => c.estado !== "cancelada");
   const porConfirmar = activas.filter(c => c.estado === "agendada").length;
   const pendRec = activas.filter(c => !c.recordado && c.cl.acepta_whatsapp).length;
+  const pendAbono = activas.filter(c => c.estado === "pendiente_abono").length;
   const tiles = `<div class="tiles">
     <div class="tile"><small>Citas del día</small><b class="num">${activas.length}</b></div>
     <div class="tile ${porConfirmar ? "alert" : ""}"><small>Por confirmar</small><b class="num">${porConfirmar}</b></div>
     <div class="tile ${pendRec ? "alert" : ""}"><small>Recordatorios por enviar</small><b class="num">${pendRec}</b></div>
-    <div class="tile"><small>Horas libres</small><b class="num">${horasTxt(minutosLibres(ST.diaPanel))}</b></div></div>`;
+    ${ST.neg.requiere_abono || pendAbono ? `<div class="tile ${pendAbono ? "alert" : ""}"><small>Esperando abono</small><b class="num">${pendAbono}</b></div>`
+      : `<div class="tile"><small>Horas libres</small><b class="num">${horasTxt(minutosLibres(ST.diaPanel))}</b></div>`}</div>`;
   const bar = `<div class="daybar">${dias.map(f => `<button class="dchip" aria-pressed="${f===ST.diaPanel}" data-action="dia" data-f="${f}">
     <span class="cap">${f === hoyISO() ? "Hoy" : fechaCorta(f)}</span><span class="count num">${activasDe(f).length}</span></button>`).join("")}</div>`;
   const lista = delDia.length ? `<div class="list">${delDia.map(c => {
     const wa = c.estado === "cancelada" ? "" : c.cl.acepta_whatsapp && c.cl.telefono
       ? `<a class="btn btn-wa btn-sm" href="https://wa.me/56${c.cl.telefono}?text=${encodeURIComponent(msgRecordatorio(c))}" target="_blank" rel="noopener" data-action="wa" data-id="${c.id}">${c.recordado ? "Recordar de nuevo" : "Recordar por WhatsApp"}</a>`
       : `<button class="btn btn-sm" disabled title="La clienta no autorizó WhatsApp">Sin autorización WhatsApp</button>`;
-    const conf = c.estado === "agendada" ? `<button class="btn btn-sm" data-action="estado" data-id="${c.id}" data-e="confirmada">Marcar confirmada</button>` : "";
+    const conf = c.estado === "agendada" ? `<button class="btn btn-sm" data-action="estado" data-id="${c.id}" data-e="confirmada">Marcar confirmada</button>`
+      : c.estado === "pendiente_abono" ? `<button class="btn btn-sm btn-primary" data-action="abono-ok" data-id="${c.id}">Abono recibido</button>` : "";
     const canc = c.estado !== "cancelada" ? `<button class="btn btn-sm" data-action="estado" data-id="${c.id}" data-e="cancelada">Cancelar</button>`
       : `<button class="btn btn-sm" data-action="estado" data-id="${c.id}" data-e="agendada">Reactivar</button>`;
     return `<div class="cita ${c.estado} ${ST.resaltar===c.id ? "nueva" : ""}">
       <div class="hora num">${c.hora}<small>hasta ${c.horaFin}</small></div>
       <div class="who"><b>${esc(c.cl.nombre)}</b><div>${esc(c.sv.nombre)} · ${clp.format(c.sv.precio)} · ${fmtTel(c.cl.telefono)}</div>
-        <div class="pills"><span class="pill ${c.estado === "no_asistio" ? "cancelada" : c.estado}">${{agendada:"Por confirmar",confirmada:"Confirmada",cancelada:"Cancelada",no_asistio:"No asistió"}[c.estado]}</span>
+        ${c.estado === "pendiente_abono" ? `<div class="abonoline">Abono ${clp.format(c.abono_monto)} · se anula solo si no llega antes de ${vencimiento(c.expira_en)}</div>` : ""}
+        ${c.comentario ? `<div class="comentario">💬 ${esc(c.comentario)}</div>` : ""}
+        <div class="pills"><span class="pill ${ESTADO_PILL[c.estado]}">${c.estado === "cancelada" && c.cancelada_por === "clienta" ? "Anulada por la clienta" : c.estado === "cancelada" && c.cancelada_por === "sistema" ? "Anulada: sin abono" : ESTADO_TXT[c.estado]}</span>
+        ${c.abono_pagado ? `<span class="pill sent">Abono recibido</span>` : ""}
+        ${c.reprogramada_en ? `<span class="pill info">Cambió su hora</span>` : ""}
         ${c.estado !== "cancelada" && c.cl.acepta_whatsapp ? (c.recordado ? `<span class="pill sent">Recordatorio enviado</span>` : `<span class="pill info">Recordatorio pendiente</span>`) : ""}
-        ${c.vista ? "" : `<span class="pill info">Nueva</span>`}</div></div>
+        ${c.vista ? "" : `<span class="pill info">Nuevo</span>`}</div></div>
       <div class="acts">${wa}${conf}${canc}</div></div>`; }).join("")}</div>`
     : `<div class="empty">No hay citas este día. Todo el horario está disponible.</div>`;
   return `${tiles}<div class="agendabar"><h2 class="cap" style="font-size:18px">${fechaLarga(ST.diaPanel)}</h2>${toggle}</div>${bar}${lista}`;
@@ -918,6 +1083,14 @@ function personalizarHTML(){
         <div class="field"><label for="pCierra">Cierra</label><select id="pCierra">${opts(hhmm(N.cierre))}</select></div></div>
       <div class="field"><span class="lbl">Días de atención</span>
         <div class="daysel">${nd.map(([n,l]) => `<label><input type="checkbox" class="pDia" value="${n}" ${(N.dias || []).includes(n) ? "checked" : ""}>${l}</label>`).join("")}</div></div>
+      <div class="field"><label for="pIg">Instagram (opcional)</label><input id="pIg" value="${esc(N.instagram || "")}" placeholder="@minegocio"></div>
+      <div class="card pane" style="padding:14px;gap:10px;background:var(--surface-2)">
+        <label class="check" for="pAbono"><input type="checkbox" id="pAbono" ${N.requiere_abono ? "checked" : ""}><span><b>Pedir abono para reservar</b> · la hora se anula sola si no llega a tiempo</span></label>
+        <div class="formrow"><div class="field"><label for="pAbMonto">Monto del abono ($)</label><input id="pAbMonto" type="number" min="0" step="500" value="${N.abono_monto || 0}"></div>
+          <div class="field"><label for="pAbHoras">Plazo para pagarlo (horas)</label><input id="pAbHoras" type="number" min="1" max="48" value="${N.abono_horas || 2}"></div></div>
+        <div class="field"><label for="pAbDatos">Datos para transferir el abono</label><textarea id="pAbDatos" rows="4" placeholder="Nombre, RUT, banco, tipo y número de cuenta, correo">${esc(N.abono_datos || "")}</textarea></div>
+      </div>
+      <div class="field"><label for="pHorasCambio">Las clientas pueden cambiar o anular su hora hasta (horas antes)</label><input id="pHorasCambio" type="number" min="0" max="72" value="${N.horas_cambio ?? 2}"></div>
       <div class="field"><span class="lbl">Color principal</span>
         <div class="swatches">${COLORES.map(([c,l]) => `<button type="button" class="sw" style="background:${c}" title="${l}" aria-label="${l}" aria-pressed="${N.color===c}" data-action="color" data-c="${c}"></button>`).join("")}
           <label class="hint" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="color" class="sw-custom" id="pColor" value="${N.color || "#c2185b"}">Otro color</label></div></div>
@@ -952,6 +1125,82 @@ function linkHTML(){
     <div class="card pane" style="padding:18px;align-items:center;text-align:center">
       <div id="qr" class="qrbox"></div><p class="muted" style="margin:0;font-size:13px">Código QR del link. Sácale captura o imprímelo para el espejo o la caja.</p></div></div>`;
 }
+function historialHTML(){
+  if (ST.movs === null) { cargarMovs(); return `<div class="empty">Cargando historial…</div>`; }
+  return `<div class="card pane" style="padding:16px;margin-bottom:16px"><h2>Descargar a Excel</h2>
+      <p class="muted" style="margin:0">Se descarga un archivo .csv que se abre con Excel o Google Sheets.</p>
+      <div class="links"><button class="btn btn-primary btn-sm" data-action="exportar" data-tipo="citas">Todas las citas</button>
+        <button class="btn btn-sm" data-action="exportar" data-tipo="clientas">Clientas</button>
+        <button class="btn btn-sm" data-action="exportar" data-tipo="movimientos">Movimientos</button></div></div>
+    <h2 style="font-size:18px;margin-bottom:10px">Últimos movimientos</h2>
+    ${movsTabla(ST.movs, false)}`;
+}
+function movsTabla(movs, conNegocio){
+  if (!movs.length) return `<div class="empty">Aún no hay movimientos registrados.</div>`;
+  const neg = id => (ST.sup.negocios.find(n => n.id === id) || {}).nombre || "—";
+  return `<div class="tablewrap"><table><thead><tr><th>Fecha</th>${conNegocio ? "<th>Negocio</th>" : ""}<th>Quién</th><th>Qué pasó</th></tr></thead><tbody>
+    ${movs.map(m => `<tr><td class="num">${fechaHora(m.creado_en)}</td>${conNegocio ? `<td>${esc(neg(m.negocio_id))}</td>` : ""}<td>${esc(m.actor)}</td><td class="notes">${esc(m.detalle)}</td></tr>`).join("")}
+  </tbody></table></div>`;
+}
+async function cargarMovs(){
+  try { ST.movs = await q(sb.from("movimientos").select("creado_en,actor,detalle,negocio_id").eq("negocio_id", ST.neg.id).order("creado_en", { ascending:false }).limit(100)); }
+  catch (e) { ST.movs = []; toast(`<b>No se pudo cargar el historial</b><br>${esc(msgErr(e))}`); }
+  if (ST.vista === "admin" && ST.tab === "historial") render();
+}
+
+/* ---------- Descargas a Excel (CSV) ---------- */
+async function traerTodo(armar){
+  const out = [];
+  for (let desde = 0; desde < 100000; desde += 1000){ const filas = await q(armar().range(desde, desde + 999)); out.push(...filas); if (filas.length < 1000) break; }
+  return out;
+}
+function descargarCSV(nombre, encabezados, filas){
+  const celda = v => { const t = v == null ? "" : String(v); return /[;"\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  const txt = "\ufeff" + [encabezados, ...filas].map(f => f.map(celda).join(";")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([txt], { type:"text/csv;charset=utf-8" }));
+  const a = document.createElement("a"); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+async function exportar(tipo, negocioId, btn){
+  const hoy = hoyISO(), f = qb => negocioId ? qb.eq("negocio_id", negocioId) : qb;
+  const sufijo = negocioId ? "-" + ((ST.neg && ST.neg.id === negocioId ? ST.neg.slug : (ST.sup.negocios.find(n => n.id === negocioId) || {}).slug) || "negocio") : "-todos";
+  await conBoton(btn, async () => {
+    try {
+      let n = 0;
+      if (tipo === "citas"){
+        const filas = await traerTodo(() => f(sb.from("citas").select("inicio,fin,estado,comentario,abono_monto,abono_pagado,cancelada_por,creado_en,negocios(nombre),clientas(nombre,telefono,email),servicios(nombre,precio)")).order("inicio", { ascending:false }));
+        n = filas.length;
+        descargarCSV(`tucita-citas${sufijo}-${hoy}.csv`, ["Negocio","Fecha","Hora inicio","Hora fin","Clienta","Celular","Correo","Servicio","Precio","Estado","Abono","Abono recibido","Anulada por","Comentario","Reservada el"],
+          filas.map(c => { const a = partes(c.inicio), b = partes(c.fin); return [c.negocios && c.negocios.nombre, a.fecha.split("-").reverse().join("-"), a.hora, b.hora,
+            c.clientas && c.clientas.nombre, c.clientas && c.clientas.telefono, c.clientas && c.clientas.email, c.servicios && c.servicios.nombre, c.servicios && c.servicios.precio,
+            ESTADO_TXT[c.estado], c.abono_monto || "", c.abono_monto ? (c.abono_pagado ? "Sí" : "No") : "", c.cancelada_por || "", c.comentario, fechaHora(c.creado_en)]; }));
+      }
+      if (tipo === "clientas"){
+        const filas = await traerTodo(() => f(sb.from("clientas").select("nombre,telefono,email,acepta_whatsapp,notas,creado_en,negocios(nombre)")).order("nombre"));
+        n = filas.length;
+        descargarCSV(`tucita-clientas${sufijo}-${hoy}.csv`, ["Negocio","Nombre","Celular","Correo","Acepta WhatsApp","Notas","Registrada el"],
+          filas.map(c => [c.negocios && c.negocios.nombre, c.nombre, c.telefono, c.email, c.acepta_whatsapp ? "Sí" : "No", c.notas, fechaHora(c.creado_en)]));
+      }
+      if (tipo === "movimientos"){
+        const filas = await traerTodo(() => f(sb.from("movimientos").select("creado_en,actor,detalle,negocios(nombre)")).order("creado_en", { ascending:false }));
+        n = filas.length;
+        descargarCSV(`tucita-movimientos${sufijo}-${hoy}.csv`, ["Fecha","Negocio","Quién","Qué pasó"], filas.map(m => [fechaHora(m.creado_en), m.negocios && m.negocios.nombre, m.actor, m.detalle]));
+      }
+      if (tipo === "pagos"){
+        const filas = await traerTodo(() => f(sb.from("pagos").select("fecha,monto,pagado_hasta,nota,negocios(nombre)")).order("fecha", { ascending:false }));
+        n = filas.length;
+        descargarCSV(`tucita-pagos${sufijo}-${hoy}.csv`, ["Fecha","Negocio","Monto","Plan pagado hasta","Nota"], filas.map(p => [p.fecha.split("-").reverse().join("-"), p.negocios && p.negocios.nombre, p.monto, p.pagado_hasta.split("-").reverse().join("-"), p.nota]));
+      }
+      if (tipo === "negocios"){
+        n = ST.sup.negocios.length;
+        descargarCSV(`tucita-negocios-${hoy}.csv`, ["Negocio","Link","Rubro","Dirección","WhatsApp","Plan","Estado","Pagado hasta","Pide abono","Creado el"],
+          ST.sup.negocios.map(x => [x.nombre, linkReservas(x.slug), x.rubro, x.direccion, x.tel_negocio, planDe(x.plan).nombre, ESTADOS[estadoDe(x, ST.ajustes)][1], x.pagado_hasta.split("-").reverse().join("-"), x.requiere_abono ? "Sí" : "No", fechaHora(x.creado_en)]));
+      }
+      toast(`<b>Descarga lista</b><br>${plural(n, "fila", "filas")}. Revisa tu carpeta de descargas.`);
+    } catch (e) { toast(`<b>No se pudo descargar</b><br>${esc(msgErr(e))}`); }
+  });
+}
+
 function pintarQR(){
   const box = document.getElementById("qr"); if (!box) return;
   try { const qr = window.qrcode(0, "M"); qr.addData(linkReservas(ST.neg.slug)); qr.make(); box.innerHTML = qr.createSvgTag({ cellSize:5, margin:2 }); }
@@ -982,8 +1231,14 @@ async function guardarMarca(btn){
   if (toMin(v("pCierra")) - toMin(v("pAbre")) < 60) { err.innerHTML = `<div class="err">La hora de cierre debe ser al menos una hora después de la apertura.</div>`; return; }
   if (!dias.length) { err.innerHTML = `<div class="err">Marca al menos un día de atención.</div>`; return; }
   if (tel && !/^9\d{8}$/.test(tel)) { err.innerHTML = `<div class="err">El WhatsApp debe tener 9 dígitos y empezar con 9.</div>`; return; }
+  const requiere = document.getElementById("pAbono").checked, monto = parseInt(v("pAbMonto"), 10) || 0, plazo = parseInt(v("pAbHoras"), 10), hc = parseInt(v("pHorasCambio"), 10);
+  if (requiere && monto < 500) { err.innerHTML = `<div class="err">Si pides abono, escribe un monto (mínimo $500).</div>`; return; }
+  if (!(plazo >= 1 && plazo <= 48)) { err.innerHTML = `<div class="err">El plazo del abono debe estar entre 1 y 48 horas.</div>`; return; }
+  if (requiere && !v("pAbDatos")) { err.innerHTML = `<div class="err">Escribe los datos de transferencia para el abono.</div>`; return; }
+  if (!(hc >= 0 && hc <= 72)) { err.innerHTML = `<div class="err">Las horas para cambios deben estar entre 0 y 72.</div>`; return; }
   const cambios = { nombre:v("pNombre"), rubro:v("pRubro"), direccion:v("pDir"), tel_negocio:tel, correo_negocio:v("pMail"),
-    apertura:v("pAbre"), cierre:v("pCierra"), dias, color:ST.neg.color, fondo_op:Number(ST.neg.fondo_op) };
+    apertura:v("pAbre"), cierre:v("pCierra"), dias, color:ST.neg.color, fondo_op:Number(ST.neg.fondo_op),
+    instagram:v("pIg"), requiere_abono:requiere, abono_monto:monto, abono_horas:plazo, abono_datos:document.getElementById("pAbDatos").value.trim(), horas_cambio:hc };
   await conBoton(btn, async () => {
     try { await q(sb.from("negocios").update(cambios).eq("id", ST.neg.id)); Object.assign(ST.neg, cambios); ST.guardado = "marca"; render();
       setTimeout(() => { ST.guardado = ""; const b = document.querySelector("#formMarca .btn-primary"); if (b) b.textContent = "Guardar cambios"; }, 1800); }
@@ -1010,17 +1265,18 @@ async function subirImagen(input, campo){
 async function cargarSuper(){
   pararCanal(); ST.soporte = false; ST.vista = "cargando"; aplicarMarca(null); render();
   try {
-    const [negocios, perfiles, invitaciones, avisos, planes, ajustes, proximas] = await Promise.all([
+    const [negocios, perfiles, invitaciones, avisos, planes, ajustes, proximas, movs] = await Promise.all([
       q(sb.from("negocios").select("*").order("creado_en")),
       q(sb.from("perfiles").select("id,email,negocio_id,rol")),
       q(sb.from("invitaciones").select("*")),
       q(sb.from("avisos_pago").select("*").eq("revisado", false).order("creado_en")),
       q(sb.from("planes").select("*").order("precio")),
       q(sb.from("ajustes").select("*").single()),
-      q(sb.from("citas").select("negocio_id").gte("inicio", new Date().toISOString()).neq("estado", "cancelada"))
+      q(sb.from("citas").select("negocio_id").gte("inicio", new Date().toISOString()).neq("estado", "cancelada")),
+      q(sb.from("movimientos").select("creado_en,actor,detalle,negocio_id").order("creado_en", { ascending:false }).limit(40))
     ]);
     const cuenta = {}; proximas.forEach(c => cuenta[c.negocio_id] = (cuenta[c.negocio_id] || 0) + 1);
-    Object.assign(ST.sup, { negocios, perfiles, invitaciones, avisos, proximas:cuenta });
+    Object.assign(ST.sup, { negocios, perfiles, invitaciones, avisos, proximas:cuenta, movs });
     ST.planes = planes; ST.ajustes = ajustes;
     ST.vista = "super"; render();
   } catch (e) { ST.vista = "sinNegocio"; render(); toast(`<b>No pudimos cargar el panel</b><br>${esc(msgErr(e))}`); }
@@ -1082,7 +1338,17 @@ function superHTML(){
         <div class="field"><label for="nPlan">Plan</label><select id="nPlan">${ST.planes.map(p => `<option value="${p.clave}">${esc(p.nombre)} · ${clp.format(p.precio)}/mes</option>`).join("")}</select></div>
         ${U.error ? `<div class="err" role="alert">${esc(U.error)}</div>` : ""}
         <button class="btn btn-primary" type="button" data-action="enviar">Crear negocio</button></form>
-      ${nuevo}</div>`;
+      ${nuevo}</div>
+    <div class="card pane" style="padding:18px;margin-top:16px"><h2>Historial y descargas a Excel</h2>
+      <div class="formrow"><div class="field"><label for="supNeg">Negocio</label><select id="supNeg"><option value="">Todos los negocios</option>
+        ${U.negocios.map(n => `<option value="${n.id}" ${U.filtro === n.id ? "selected" : ""}>${esc(n.nombre)}</option>`).join("")}</select></div></div>
+      <div class="links"><button class="btn btn-primary btn-sm" data-action="exportar" data-tipo="citas" data-sup="1">Citas</button>
+        <button class="btn btn-sm" data-action="exportar" data-tipo="movimientos" data-sup="1">Movimientos</button>
+        <button class="btn btn-sm" data-action="exportar" data-tipo="clientas" data-sup="1">Clientas</button>
+        <button class="btn btn-sm" data-action="exportar" data-tipo="pagos" data-sup="1">Pagos</button>
+        <button class="btn btn-sm" data-action="exportar" data-tipo="negocios">Negocios</button></div>
+      <p class="muted" style="margin:0;font-size:13px">Archivos .csv que se abren con Excel o Google Sheets. Abajo, los últimos 40 movimientos de todos los negocios.</p>
+      ${movsTabla(U.movs || [], true)}</div>`;
 }
 function ajustesHTML(){
   const aj = ST.ajustes;
@@ -1146,14 +1412,36 @@ document.addEventListener("click", e => {
     case "pick-day": R.fecha = el.dataset.f; R.paso = 3; R.error = ""; return cargarHoras();
     case "pick-hora": R.hora = el.dataset.h; R.paso = 4; R.error = ""; return render();
     case "back": R.paso = Math.max(1, R.paso - 1); R.error = ""; if (R.paso === 3) return cargarHoras(); return render();
-    case "nueva": Object.assign(R, { paso:1, servicioId:null, fecha:null, hora:null, horas:null, error:"", resultado:null }); return render();
+    case "nueva": Object.assign(R, { paso:1, servicioId:null, fecha:null, hora:null, horas:null, error:"", resultado:null }); ST.mis.abierto = false; return render();
+    /* mis horas */
+    case "mis-abrir": ST.mis.abierto = true; ST.mis.cambio = null; ST.mis.anular = null; window.scrollTo(0, 0); return cargarMisHoras();
+    case "mis-cerrar": ST.mis.abierto = false; Object.assign(R, { paso:1, servicioId:null, fecha:null, hora:null, horas:null, error:"", resultado:null }); return render();
+    case "comentar": { const t = el.dataset.t, txt = (document.getElementById("com-" + t) || {}).value || "";
+      return conBoton(el, async () => { try { await q(sb.rpc("comentar_cita", { p_token:t, p_texto:txt })); delete ST.mis.borradores[t]; toast("<b>Comentario enviado</b><br>El local lo verá en su agenda."); await cargarMisHoras(); }
+        catch (err) { toast(`<b>No se pudo enviar</b><br>${esc(msgErr(err))}`); } }); }
+    case "mh-cambiar": ST.mis.cambio = { token:el.dataset.t, fecha:null, horas:null, hora:null }; ST.mis.anular = null; return render();
+    case "mh-cerrar": ST.mis.cambio = null; return render();
+    case "mh-dia": { const ch = ST.mis.cambio; ch.fecha = el.dataset.f; ch.horas = null; ch.hora = null; render();
+      (async () => { try { const d = await q(sb.rpc("horas_libres_cambio", { p_token:ch.token, p_fecha:ch.fecha })); ch.horas = (d || []).map(x => typeof x === "string" ? x : Object.values(x)[0]); }
+        catch (err) { ch.horas = []; toast(`<b>No se pudieron cargar las horas</b><br>${esc(msgErr(err))}`); } render(); })(); return; }
+    case "mh-hora": ST.mis.cambio.hora = el.dataset.h; return render();
+    case "mh-ok": { const ch = ST.mis.cambio;
+      return conBoton(el, async () => { try { await q(sb.rpc("reprogramar_cita", { p_token:ch.token, p_fecha:ch.fecha, p_hora:ch.hora })); ST.mis.cambio = null; toast(`<b>Hora cambiada</b><br>Nueva hora: ${esc(fechaCorta(ch.fecha))} · ${ch.hora}`); await cargarMisHoras(); }
+        catch (err) { toast(`<b>No se pudo cambiar</b><br>${esc(msgErr(err))}`); } }); }
+    case "mh-anular": ST.mis.anular = el.dataset.t; return render();
+    case "mh-anular-no": ST.mis.anular = null; return render();
+    case "mh-anular-ok": { const t = el.dataset.t;
+      return conBoton(el, async () => { try { await q(sb.rpc("cancelar_cita", { p_token:t })); ST.mis.anular = null; toast("<b>Hora anulada</b><br>Le avisamos al local."); await cargarMisHoras(); }
+        catch (err) { toast(`<b>No se pudo anular</b><br>${esc(msgErr(err))}`); } }); }
     /* login */
     case "login-tab": ST.login.tab = el.dataset.t; ST.login.error = ""; ST.login.info = ""; return render();
     case "olvide": return olvide(el);
     case "logout": return salir();
     case "recargar": return cargarPerfil(true);
     /* admin */
-    case "tab": ST.tab = el.dataset.tab; ST.campana = false; return render();
+    case "tab": ST.tab = el.dataset.tab; ST.campana = false; if (ST.tab === "historial") ST.movs = null; return render();
+    case "abono-ok": return cambiarCita(id, { abono_pagado:true, estado:"confirmada" });
+    case "exportar": return exportar(el.dataset.tipo, el.dataset.sup ? (ST.sup.filtro || null) : (ST.neg ? ST.neg.id : null), el);
     case "modo": ST.modo = el.dataset.m; return render();
     case "ir-dia": ST.diaPanel = el.dataset.f; ST.modo = "dia"; ST.resaltar = id || null; return render();
     case "dia": ST.diaPanel = el.dataset.f; return render();
@@ -1198,6 +1486,7 @@ document.addEventListener("input", e => {
   if (id === "inEmail") R.email = e.target.value;
   if (id === "lgEmail") ST.login.email = e.target.value;
   if (id === "lgPass") ST.login.pass = e.target.value;
+  if (e.target.classList.contains("comtxt")) ST.mis.borradores[e.target.dataset.t] = e.target.value;
   if (id === "inBuscar") { ST.buscar = e.target.value; document.getElementById("tablaClientas").innerHTML = tablaClientas();
     document.getElementById("totalClientas").textContent = `${filtrarClientas().length} de ${ST.clientas.length} clientas`; }
   if (id === "pColor") { ST.neg.color = e.target.value; aplicarMarca(ST.neg); document.querySelectorAll(".sw").forEach(b => b.setAttribute("aria-pressed", "false")); }
@@ -1206,6 +1495,7 @@ document.addEventListener("input", e => {
 document.addEventListener("change", async e => {
   const id = e.target.id;
   if (id === "inWa") ST.reserva.wa = e.target.checked;
+  if (id === "supNeg") ST.sup.filtro = e.target.value;
   if (id === "pLogo") subirImagen(e.target, "logo_url");
   if (id === "pFondo") subirImagen(e.target, "fondo_url");
   if (e.target.classList.contains("nota")) {
