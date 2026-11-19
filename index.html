@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TUCITA</title>
 <meta name="theme-color" content="#c2185b">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TUCITA">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
@@ -348,6 +353,70 @@ const SUPABASE_URL = "https://goeqtafavkibgudfidbw.supabase.co";
 const SUPABASE_KEY = "sb_publishable_FIqT_UhhjLK18w6x-KD7Sg_ibx2IqEf";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const TZ = "America/Santiago";
+const VAPID_PUBLIC = "BOP6Yjgg8vlqE9lX0it9NpK2yiJ9SlGX9SgD7FA1mNaBsIg2MnvUdZweyzytP2RaaIU2NHiIm1UAM3Vn6JdN8_k";
+
+/* ---------- Avisos al celular (push) ---------- */
+const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const enPantallaInicio = () => { try { return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; } catch (_) { return false; } };
+const pushSoportado = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+let swReg = null;
+async function registrarSW(){ if ("serviceWorker" in navigator) { try { swReg = await navigator.serviceWorker.register("/sw.js"); } catch (_) {} } }
+function b64aBytes(b){ const p = "=".repeat((4 - b.length % 4) % 4); const t = atob((b + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from([...t].map(c => c.charCodeAt(0))); }
+async function suscripcionPush(pedir){
+  if (!pushSoportado()) throw new Error(esIOS && !enPantallaInicio() ? "IOS_INSTALAR" : "NO_SOPORTA");
+  const reg = swReg || await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub){
+    if (!pedir) return null;
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") throw new Error("DENEGADO");
+    sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:b64aBytes(VAPID_PUBLIC) });
+  }
+  return sub.toJSON();
+}
+function msgPush(e){
+  const m = e && e.message;
+  if (m === "IOS_INSTALAR") return "En iPhone primero agrega TUCITA a tu pantalla de inicio: toca Compartir (el cuadrado con flecha) → «Agregar a inicio». Luego ábrela desde ese ícono y vuelve a tocar este botón.";
+  if (m === "NO_SOPORTA") return "Este navegador no permite avisos. Prueba con Chrome en Android o Safari en iPhone.";
+  if (m === "DENEGADO") return "Los avisos están bloqueados. Actívalos en la configuración del navegador para este sitio y vuelve a intentarlo.";
+  if (e && (e.name === "NotAllowedError" || e.name === "AbortError" || /Registration failed|push service/i.test(m || ""))) return "El navegador no permitió activar los avisos. Revisa que no estés en modo incógnito y que las notificaciones de este sitio estén permitidas.";
+  return msgErr(e);
+}
+const pushListo = k => { try { return localStorage.getItem("tucita_push_" + k) === "1" && "Notification" in window && Notification.permission === "granted"; } catch (_) { return false; } };
+const marcarPush = k => { try { localStorage.setItem("tucita_push_" + k, "1"); } catch (_) {} };
+async function activarPushAdmin(btn){
+  await conBoton(btn, async () => {
+    try {
+      const s = await suscripcionPush(true);
+      await q(sb.rpc("guardar_push_admin", { p_endpoint:s.endpoint, p_p256dh:s.keys.p256dh, p_auth:s.keys.auth }));
+      marcarPush("admin:" + ST.neg.id);
+      toast("<b>Avisos activados</b><br>Te avisaremos en este dispositivo de cada reserva, cambio, anulación y comentario, aunque TUCITA esté cerrada.");
+    } catch (e) { toast(`<b>No se activaron los avisos</b><br>${esc(msgPush(e))}`); }
+  });
+  render();
+}
+async function activarPushClienta(btn, silencioso){
+  const tokens = leerTokens().filter(x => x.s === ST.slug).map(x => x.t);
+  if (!tokens.length) return;
+  const correr = async () => {
+    try {
+      const s = await suscripcionPush(!silencioso);
+      if (!s) return;
+      await q(sb.rpc("guardar_push_clienta", { p_tokens:tokens, p_endpoint:s.endpoint, p_p256dh:s.keys.p256dh, p_auth:s.keys.auth }));
+      marcarPush("cli:" + ST.slug);
+      if (!silencioso) toast("<b>Avisos activados</b><br>Te avisaremos cuando el local confirme o cambie tu hora, y te recordaremos el día antes.");
+    } catch (e) { if (!silencioso) toast(`<b>No se activaron los avisos</b><br>${esc(msgPush(e))}`); }
+  };
+  if (btn) await conBoton(btn, correr); else await correr();
+  if (!silencioso) render();
+}
+function avisoPushClientaHTML(){
+  if (pushListo("cli:" + ST.slug)) return `<div class="info">🔔 Avisos activados en este teléfono.</div>`;
+  return `<div class="summary" style="text-align:left"><b>🔔 Recibe avisos de tu hora</b>
+    <span>Te avisamos cuando el local confirme tu hora o reciba tu abono, y te recordamos el día antes.</span>
+    <div class="links" style="margin-top:6px"><button class="btn btn-sm btn-primary" data-action="push-cli">Activar avisos en este teléfono</button></div>
+    ${esIOS && !enPantallaInicio() ? `<span class="hint">En iPhone: primero toca Compartir → «Agregar a inicio», abre TUCITA desde ese ícono y activa los avisos ahí.</span>` : ""}</div>`;
+}
 
 /* ---------- Utilidades ---------- */
 const pad = n => String(n).padStart(2, "0");
@@ -485,6 +554,7 @@ async function iniciarReserva(){
     else {
       ST.pub = data; aplicarMarca(data); document.title = `${data.nombre} · Reserva tu hora`;
       const params = new URLSearchParams(location.search), r = params.get("r");
+      if (params.get("mis") === "1") { ST.mis.abierto = true; render(); return cargarMisHoras(); }
       if (r && /^[0-9a-f-]{36}$/i.test(r)) {
         guardarToken(r.toLowerCase(), ST.slug); params.delete("r");
         try { history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "")); } catch (_) {}
@@ -601,6 +671,7 @@ function exitoHTML(){
         ${miTel.length === 9 ? `<a class="btn btn-sm btn-wa" href="https://wa.me/56${miTel}?text=${encodeURIComponent(`Mi hora en ${P.nombre}: ${link}`)}" target="_blank" rel="noopener">Enviarme el link por WhatsApp</a>` : ""}
         <button class="btn btn-sm" data-action="copiar" data-txt="${esc(link)}">Copiar mi link</button></div>
       <span class="hint">Con ese link puedes entrar a tu reserva desde cualquier teléfono.</span></div>
+    ${avisoPushClientaHTML()}
     ${infoLocalHTML(P)}
     ${!pendiente && tel.length === 9 ? `<a class="btn btn-wa" href="https://wa.me/56${tel}?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener">Avisar al local por WhatsApp</a>` : ""}
     <button class="link" data-action="nueva">Hacer otra reserva</button>
@@ -612,7 +683,8 @@ async function cargarMisHoras(){
   const tokens = leerTokens().map(x => x.t);
   ST.mis.citas = null; render();
   if (!tokens.length) { ST.mis.citas = []; return render(); }
-  try { const data = await q(sb.rpc("mis_citas", { p_tokens: tokens })); ST.mis.citas = (data || []).filter(c => c.negocio.slug === ST.slug); }
+  try { const data = await q(sb.rpc("mis_citas", { p_tokens: tokens })); ST.mis.citas = (data || []).filter(c => c.negocio.slug === ST.slug);
+    if ("Notification" in window && Notification.permission === "granted") activarPushClienta(null, true); }
   catch (e) { ST.mis.citas = []; toast(`<b>No pudimos cargar tus horas</b><br>${esc(msgErr(e))}`); }
   render();
 }
@@ -666,7 +738,7 @@ function misHorasHTML(){
   }
   return `<div class="phone">${bizHeaderPub()}<div class="pane">
     <button class="link back" data-action="mis-cerrar">← Reservar una hora</button>
-    <h2>Mis horas</h2>${body}</div></div><p class="note">Reservas con TUCITA</p>`;
+    <h2>Mis horas</h2>${C && C.length ? avisoPushClientaHTML() : ""}${body}</div></div><p class="note">Reservas con TUCITA</p>`;
 }
 
 async function cargarHoras(){
@@ -690,6 +762,7 @@ async function confirmarReserva(btn){
       R.resultado = await q(sb.rpc("reservar", { p_slug:ST.slug, p_servicio:R.servicioId, p_fecha:R.fecha, p_hora:R.hora,
         p_nombre:nombre, p_telefono:tel, p_email:email || null, p_whatsapp:R.wa }));
       R.paso = 5; R.error = ""; guardarToken(R.resultado.token, ST.slug);
+      if ("Notification" in window && Notification.permission === "granted") activarPushClienta(null, true);
     } catch (e) { R.error = msgErr(e); }
   });
   render();
@@ -886,6 +959,9 @@ function adminHTML(){
       <p>Horario ${hhmm(N.apertura)}–${hhmm(N.cierre)} · ${plural((N.dias || []).length, "día", "días")} de atención a la semana</p></div>
       <div class="head-actions">${campanaHTML()}</div></div>
     ${bannerPlan(est)}
+    ${!ST.soporte && !pushListo("admin:" + N.id) ? `<div class="banner neutral"><span>🔔 Recibe un aviso en este celular cada vez que reserven, cambien, anulen o comenten, aunque TUCITA esté cerrada.
+      ${esIOS && !enPantallaInicio() ? "<br><small class='muted'>En iPhone: primero Compartir → «Agregar a inicio» y abre TUCITA desde ese ícono.</small>" : ""}</span>
+      <button class="btn btn-sm btn-primary" data-action="push-admin">Activar avisos</button></div>` : ""}
     <div class="tabs" role="tablist">${tabs.map(([k,l]) => `<button role="tab" aria-selected="${ST.tab===k}" data-action="tab" data-tab="${k}">${l}</button>`).join("")}</div>
     ${bodies[ST.tab]()}</div>`;
 }
@@ -898,7 +974,7 @@ function campanaHTML(){
       : `<div class="ditem muted" style="cursor:default">No tienes reservas nuevas. Cuando alguien reserve por tu link, aparece aquí.</div>`}
     ${nuevas.length ? `<div class="dfoot"><span class="muted">${plural(nuevas.length, "reserva nueva", "reservas nuevas")}</span>
       <button class="link" data-action="vistas">Marcar como vistas</button></div>` : ""}
-    ${!ST.soporte && "Notification" in window && Notification.permission !== "granted" ? `<div class="dfoot"><button class="link" data-action="notif">Avisarme en este dispositivo</button></div>` : ""}
+    ${!ST.soporte && !pushListo("admin:" + ST.neg.id) ? `<div class="dfoot"><button class="link" data-action="push-admin">Activar avisos en este dispositivo</button></div>` : ""}
   </div>` : "";
   return `<div class="bell"><button class="btn btn-sm" data-action="campana" aria-expanded="${ST.campana}">🔔 Nuevas</button>
     ${nuevas.length ? `<span class="badge num">${nuevas.length}</span>` : ""}</div>${drop}`;
@@ -1440,6 +1516,8 @@ document.addEventListener("click", e => {
     case "recargar": return cargarPerfil(true);
     /* admin */
     case "tab": ST.tab = el.dataset.tab; ST.campana = false; if (ST.tab === "historial") ST.movs = null; return render();
+    case "push-admin": return activarPushAdmin(el);
+    case "push-cli": return activarPushClienta(el, false);
     case "abono-ok": return cambiarCita(id, { abono_pagado:true, estado:"confirmada" });
     case "exportar": return exportar(el.dataset.tipo, el.dataset.sup ? (ST.sup.filtro || null) : (ST.neg ? ST.neg.id : null), el);
     case "modo": ST.modo = el.dataset.m; return render();
@@ -1512,6 +1590,7 @@ document.addEventListener("change", async e => {
    INICIO
    ===================================================================== */
 (function iniciar(){
+  registrarSW();
   ST.slug = slugDeRuta();
   aplicarMarca(null);
   if (ST.slug){ render(); iniciarReserva(); return; }
@@ -1522,7 +1601,14 @@ document.addEventListener("change", async e => {
       if ((evento === "SIGNED_IN" || evento === "INITIAL_SESSION") && ST.vista !== "recuperar") cargarPerfil(false);
     }, 0);
   });
-  cargarPerfil(false);
+  (async () => {
+    const { data:{ session } } = await sb.auth.getSession();
+    const guardadas = leerTokens();
+    if (!session && enPantallaInicio() && guardadas.length && !/type=/.test(location.hash)) {
+      location.replace(`/${guardadas[guardadas.length - 1].s}?mis=1`); return;
+    }
+    cargarPerfil(false);
+  })();
 })();
 
 </script>
